@@ -1,6 +1,7 @@
-# Dados_Br_R
-Introdução à linguagem R e à análise de dados para Brasil.
+# B_R_Análise de dados econômicos para o Brasil
 
-Nesse curso vamos do básico da programação em R ao básico da análise de dados, passando um pouco pela econometria.
+Introdução à linguagem R e à análise de dados econômicos para Brasil.
+
+Nesse curso vamos da programação em R à análise de dados, passando pela econometria.
 
 O objetivo é que você consiga produzir análises sobre o cenário econômico brasileiro, fundamentando sua intuição com evidências.
