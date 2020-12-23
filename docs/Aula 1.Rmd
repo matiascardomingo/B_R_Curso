@@ -1,0 +1,30 @@
+---
+title: "Aula 1"
+author: "Matias Cardomingo"
+output: html_document
+---
+
+## Introdução ao R
+
+R é uma linguagem, assim como Python, C+ e outras. Seu uso tem algumas vantagens, em primeiro lugar, ela é grátis e colaborativa (ou *open source*); em segundo lugar, ela é largamente usada para desenvolver análises estatísticas e, por isso, possui uma série de ferramentas (*pacotes*) já desenvolvidas ao longo de bastante tempo e por muitas mãos que sempre podemos usar.
+
+O **R Studio** é uma interface amigável, criada para facilitar o uso dessa linguagem.  Do lado esquerdo superior temos o *script*, no qual escrevemos os comandos e abaixo dele está o *console*, responsável por executar esses comandos. Já do lado esquerdo nós temos, na parte superior, a listagem de todos os *objetos* (vamos voltar a eles em breve) do *ambiente*, ou seja, tudo aquilo que estamos utilizando e já foi armazenado pelo programa. Por fim, na parte inferior direita nós temos uma espécie de vizualizador, no qual podermos ver a descrição dos comandos, nosso gráficos, entre outras coisas.
+
+### Objetos
+
+Tudo o que vamos criar no **R** são *objetos* para podermos manipular através das funções. Por exemplo, vamos criar o *objeto* `a` digitando o código a seguir e apertando `Crtl + Enter`.
+
+```{r I, echo=TRUE}
+
+a <- 5
+
+```
+
+A definição através da seta `<-` é a mais usual dessa linguagem, embora funcione usar `=`. Veja agora que o **R** passa a entender `a` como 5.
+
+```{r II, echo=TRUE}
+
+a + 10
+
+```
+
