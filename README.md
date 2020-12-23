@@ -1,5 +1,4 @@
 # B_R_Análise de dados econômicos para o Brasil
----
 
 Introdução à linguagem R e à análise de dados econômicos para Brasil.
 
