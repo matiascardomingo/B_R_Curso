@@ -5,7 +5,7 @@ output: html_document
 bibliography: aula.bib
 ---
 
-## Introdução ao R
+## Deixar o curso mais legal
 
 R é uma linguagem usada entre humanos e entre humanos e máquinas. Seu nome vem do fato de ter sido desenvolvida, ainda em 1991, por *Ross Ihaka* e *Robert Gentleman* na Nova Zelândia, tendo posteriormente integrado o *Projeto GNU*, que reúne todos os softwares gratuitos voltados a substituir programas que exigem assinaturas pagas - no caso da economia trata-se principalmente do *Stata* e do *E-Views*. Seu uso tem algumas vantagens, em primeiro lugar, ela é grátis e colaborativa (ou *open source*); em segundo lugar, ela é largamente usada para desenvolver análises estatísticas e, por isso, possui uma série de ferramentas (*pacotes*) já desenvolvidas ao longo de bastante tempo e por muitas mãos que sempre podemos usar.
 
