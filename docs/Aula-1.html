@@ -185,17 +185,187 @@ summary {
 
 <div id="introdução-ao-r" class="section level2">
 <h2>Introdução ao R</h2>
-<p>R é uma linguagem, assim como Python, C+ e outras. Seu uso tem algumas vantagens, em primeiro lugar, ela é grátis e colaborativa (ou <em>open source</em>); em segundo lugar, ela é largamente usada para desenvolver análises estatísticas e, por isso, possui uma série de ferramentas (<em>pacotes</em>) já desenvolvidas ao longo de bastante tempo e por muitas mãos que sempre podemos usar.</p>
-<p><a href="https://rstudio-education.github.io/hopr/">Livro</a></p>
-<p>O <strong>R Studio</strong> é uma interface amigável, criada para facilitar o uso dessa linguagem. Do lado esquerdo superior temos o <em>script</em>, no qual escrevemos os comandos e abaixo dele está o <em>console</em>, responsável por executar esses comandos. Já do lado esquerdo nós temos, na parte superior, a listagem de todos os <em>objetos</em> (vamos voltar a eles em breve) do <em>ambiente</em>, ou seja, tudo aquilo que estamos utilizando e já foi armazenado pelo programa. Por fim, na parte inferior direita nós temos uma espécie de vizualizador, no qual podermos ver a descrição dos comandos, nosso gráficos, entre outras coisas.</p>
+<p>R é uma linguagem usada entre humanos e entre humanos e máquinas. Seu nome vem do fato de ter sido desenvolvida, ainda em 1991, por <em>Ross Ihaka</em> e <em>Robert Gentleman</em> na Nova Zelândia, tendo posteriormente integrado o <em>Projeto GNU</em>, que reúne todos os softwares gratuitos voltados a substituir programas que exigem assinaturas pagas - no caso da economia trata-se principalmente do <em>Stata</em> e do <em>E-Views</em>. Seu uso tem algumas vantagens, em primeiro lugar, ela é grátis e colaborativa (ou <em>open source</em>); em segundo lugar, ela é largamente usada para desenvolver análises estatísticas e, por isso, possui uma série de ferramentas (<em>pacotes</em>) já desenvolvidas ao longo de bastante tempo e por muitas mãos que sempre podemos usar.</p>
+<p>O <strong>R Studio</strong> é uma interface amigável, criada para facilitar o uso dessa linguagem. Do lado esquerdo superior temos o <em>script</em>, no qual escrevemos os comandos e abaixo dele está o <em>console</em>, responsável por executar esses comandos. Já do lado direito nós temos, na parte superior, a listagem de todos os <em>objetos</em> (vamos voltar a eles em breve) armazenados no <em>ambiente global</em>, ou seja, tudo aquilo que estamos utilizando e já foi armazenado pelo programa. Por fim, na parte inferior direita nós temos uma espécie de vizualizador, no qual podemos ver a descrição dos comandos, nosso gráficos, entre outras coisas.</p>
+<p><span class="citation">Wickham (2019)</span> e <span class="citation">Grolemund (2014)</span>.</p>
 <div id="objetos" class="section level3">
 <h3>Objetos</h3>
-<p>Tudo o que vamos criar no <strong>R</strong> são <em>objetos</em> para podermos manipular através das funções. Por exemplo, vamos criar o <em>objeto</em> <code>a</code> digitando o código a seguir e apertando <code>Crtl + Enter</code>.</p>
-<pre class="r"><code>a &lt;- 5</code></pre>
+<p>Tudo o que vamos criar no <strong>R</strong> são <em>objetos</em> que poderemos manusear através das funções. Por exemplo, vamos criar o <em>objeto</em> <code>a</code> digitando o código a seguir e apertando <code>Crtl + Enter</code>.</p>
+<pre class="r"><code>a &lt;- 5
+b &lt;- 10</code></pre>
 <p>A definição através da seta <code>&lt;-</code> é a mais usual dessa linguagem, embora funcione usar <code>=</code>. Veja agora que o <strong>R</strong> passa a entender <code>a</code> como 5.</p>
 <pre class="r"><code>a + 10</code></pre>
 <pre><code>## [1] 15</code></pre>
+<pre class="r"><code>a + b</code></pre>
+<pre><code>## [1] 15</code></pre>
+<pre class="r"><code>b - 10</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>a*2 - b</code></pre>
+<pre><code>## [1] 0</code></pre>
+<p>Todas as operações matemáticas usuais irão funcionar normalmente: <code>+</code>, <code>-</code>, <code>*</code> e <code>/</code>.</p>
 </div>
+<div id="dados" class="section level3">
+<h3>Dados</h3>
+<p>Os <em>objetos</em> responsáveis por armazenar nossos dados podem ser descritos por duas características principais:</p>
+<ol style="list-style-type: decimal">
+<li>Dimensão - 1d, 2d e etc</li>
+<li>Tipo de informação - homogêna ou heterogênea</li>
+</ol>
+<div id="vetores-1d---homogêneo" class="section level4">
+<h4>Vetores (1d - homogêneo)</h4>
+<p>É o objeto mais simples do R, armazena apenas um tipo de informação em uma estrutura unidimensional. Eles são formados individuamente pelo comando <code>c()</code>, de <em>concatenate</em>.</p>
+<pre class="r"><code>c &lt;- c(a, 6, 7, 8, 9, b)</code></pre>
+<p>Para identificar o tipo de informação armazenado pelo vetor podemos utilizar o comando <code>typeof()</code>. Também é possível sabermos quantos elementos compõe o vetor através do comando <code>length()</code>.</p>
+<pre><code>## [1] &quot;double&quot;</code></pre>
+<pre><code>## [1] 6</code></pre>
+<p>O tipo <code>&quot;double&quot;</code> indicado para o vetor <code>c</code> referem-se aos números normais, assim como o <code>&quot;numeric&quot;</code>. Os demais tipos são:</p>
+<ul>
+<li><p><code>&quot;integer&quot;</code> - inteiros, diferenciam-se dos dois anteriores por não considerarem os irracionais</p></li>
+<li><p><code>&quot;character&quot;</code> - textos, o elemento individual chama-se <em>string</em></p></li>
+<li><p><code>&quot;logical&quot;</code> - <code>TRUE</code> ou <code>T</code> e <code>FALSE</code> ou <code>F</code></p></li>
+</ul>
+<p>E outros dois menos usados no dia a dia.</p>
+<ul>
+<li><p><code>&quot;complex&quot;</code> - números complexos</p></li>
+<li><p><code>&quot;raw&quot;</code> - bytes puros de informação, veja digitando <code>raw(3)</code></p></li>
+</ul>
+<p>A ordem de complexidade de cada um dos tipos, ou seja, o espaço de armazenamento que cada um deles exige é:</p>
+<p><code>&quot;logical&quot; &lt; &quot;integer&quot; &lt; &quot;double&quot; &lt; &quot;character&quot;</code></p>
+</div>
+<div id="matrizes-2d---homogêneo" class="section level4">
+<h4>Matrizes (2d - homogêneo)</h4>
+<p>São formadas a partir de um conjunto de <em>vetores</em>, sendo que todos devem conter um único tipo de informação. Podemos formar matrizes unindo vetores:</p>
+<pre class="r"><code>d &lt;- cbind(a:b, c)
+
+f &lt;- rbind(a:b, c)</code></pre>
+<p>Ou construindo a partir da função <code>matrix()</code>:</p>
+<pre class="r"><code>g &lt;- matrix(data = c(a:b, c), 
+            nrow = 6, 
+            ncol = 2)</code></pre>
+<p>Repare que todos esses <em>objetos</em> que criamos ficaram separados dos demais na listagem de objetos do <em>Global Environment</em>. Eles estão sob a categoria <em>data</em>, pois começarama tomar a forma de uma base de dados, como vamos usar mais para frente.</p>
+<p>Para conseguir identificar a estrutura dessas informações o <strong>R</strong> classifica as diferentes <em>classes</em> dos objetos. Note:</p>
+<pre class="r"><code>class(d) ; class(f) ; class(g)
+
+class(a); class(b) ; class(c)</code></pre>
+<p>Ou seja, os <em>objetos</em> <code>a</code>, <code>b</code> e <code>c</code> são entendidos apenas como informações, ou valores, enquanto <code>d</code>, <code>f</code> e <code>g</code> são estruturas de dados. Ainda que o tipo de informação contida em cada um deles seja exatamente o mesmo.</p>
+<p>Agora, o que acontece se criamos uma matriz misturando informações de diferentes tipos?</p>
+<pre class="r"><code>h &lt;- matrix(data = c(c, rep(&quot;String&quot;, 6)),
+            nrow = 6,
+            ncol = 2)</code></pre>
+<p>Repare que a <em>classe</em> de <code>h</code> segue sendo <code>&quot;matrix&quot;</code>, mas as informações foram todas transformadas em <code>&quot;character&quot;</code>. Isso se deve ao nível de complexidade das informações, o <strong>R</strong> sempre transforma as informações mais simples na mesma estrutura das mais complexas. É preciso estarmos alerta para isso, pois nem todas as operações podem ser feitas com todos os <em>tipos</em> de dados, por exemplo:</p>
+<pre class="r"><code>&quot;1&quot; + &quot;2&quot;</code></pre>
+<pre><code>## Error in &quot;1&quot; + &quot;2&quot;: argumento não-numérico para operador binário</code></pre>
+</div>
+<div id="array-nd---homogêneo" class="section level4">
+<h4>Array (nd - homogêneo)</h4>
+<p>Essa estrutura consiste em uma série de matrizes, como se fossem várias camadas, por isso ela é n-dimensional.</p>
+<pre class="r"><code>e &lt;- array(cbind(c,a:b), 
+           dim = c(3,2,3), 
+           dimnames = list(c(&quot;topo&quot;, &quot;meio&quot;, &quot;baixo&quot;), 
+                           c(&quot;esq&quot;, &quot;dir&quot;)))</code></pre>
+<p>Agora vamos apresentar as estruturas de dados mais comuns no dia a dia da pesquisa, por conterem <em>tipos</em> de informações variadas.</p>
+</div>
+<div id="lista-nd---heterogêneo" class="section level4">
+<h4>Lista (nd - heterogêneo)</h4>
+<p>Trata-se de um conjunto de quaisquer objetos, apesar de sua estrutura parecer um pouco estranha à primeira vista, aos poucos vamos percebendo muitas funcionalidades.</p>
+<pre class="r"><code>f &lt;- list(lista = list(1,2,3),
+          vetor = c(1,2,3),
+          strings = paste(1:3))</code></pre>
+<p>Repare nas diferenças de <em>outputs</em><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> quando mandamos imprimir a lista <code>f</code>, afinal, temos pelo menos uma lista chamada <code>lista</code> dentro de <code>f</code>. Por fim, vamos à estrutura de dados mais comum em pesquisas.</p>
+</div>
+<div id="data-frame-2d---heterogêneo" class="section level4">
+<h4>Data frame (2d - heterogêneo)</h4>
+<p>Novamente temos um conjunto de vetores, como ocorria com as matrizes, mas nesse caso os vetores podem conter tipos de informações distintas. Por isso que o <em>tipo</em> dos data frames será sempre indicado como <code>&quot;list&quot;</code>, embora eles pertençam a uma <em>classe</em> própria dos data frames.</p>
+<pre class="r"><code>g &lt;- data.frame(d)</code></pre>
+<p>Repare que ao criarmos o objeto <code>g</code> através de <code>d</code> a primeira coluna ganhou o nome <code>&quot;V1&quot;</code>, enquanto a segunda coluna manteve o nome que já possuia. Saber esse tipo de transformação é importante para conseguirmos mais tarde selecionar os dados da forma correta.</p>
+<p>Agora que já conhecemos todas as estruturas de dados que compõem o <strong>R</strong>, vamos avançar sobre outras características dos dados.</p>
+</div>
+</div>
+<div id="atributos" class="section level3">
+<h3>Atributos</h3>
+<p>Esses funcionam como uma espécie de <em>meta-dados</em>, são informações adicionais que descrevem outras características de nossos dados. Por exemplo:</p>
+<pre class="r"><code>attr(e, &quot;nome&quot;) &lt;- &quot;teste&quot;</code></pre>
+<p>Nesse caso nós criamos um novo atributo para <code>e</code> e estabelecemos que essa informação seria chamada por <code>&quot;nome&quot;</code>. Acontece que esse objeto, ao ser formado, já possui alguns atributos próprios, como suas <em>dimensões</em> (obtida através da função <code>dim()</code>) e sua <em>classe</em> (essa você já conhece). Há várias outras formas de se estabelecer nomes, contudo, por ser uma linguagem usada no mundo todo, o mais usual é que se use <code>&quot;name&quot;</code>.</p>
+<pre class="r"><code>nomes &lt;- c(nome1 = 1, nome2 = 2)
+names(nomes) &lt;- c(&quot;nome3&quot;, &quot;nome4&quot;)
+setNames(nomes, c(&quot;nome5&quot;, &quot;nome6&quot;))</code></pre>
+<p>Finalmente, vamos ao último tópico desta introdução e um dos pontos mais importantes nas linguagens de programação.</p>
+</div>
+<div id="acessando-informações-ou-subsetting" class="section level3">
+<h3>Acessando informações ou <em>subsetting</em></h3>
+<p>Com apenas 3 comandos somos capazes de vasculhar todas as informações que precisamos em nossas estruturas de dados e, aos poucos, vamos entendendo como combinar essas instruções.</p>
+<ul>
+<li><code>[]</code> - Esse comando permite buscarmos elementos pela sua posição ou pelo nome, sendo que podemos fornecer instruções referentes ao número de dimensões do <em>objeto</em>. Logo, podemos buscar elementos de matrizes utilizando um indicador para linha e outro para coluna.</li>
+</ul>
+<pre class="r"><code>c[1] + c[length(c)]
+
+h[c(6,12)] ; h[6,c(1,2)]
+
+e[12] ; e[3,2,2] ; e[&quot;baixo&quot;, &quot;dir&quot;, 3]</code></pre>
+<p>Tente entender cada um dos comandos acima. <em>Printe</em><a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> cada um dos objetos para comparar com seus resultados. Você consegue dizer se nós estamos buscando o mesmo elemento de <code>e</code> para cada um dos comandos?</p>
+<ul>
+<li><code>[[]]</code> - Para acessar elementos das listas tanto pela posição do elemento, quanto pelo seu nome. Vamos usar a única lista que criamos nessa primeira aula <code>f</code>.</li>
+</ul>
+<pre class="r"><code>f[[1]] ; f[[2]] ; f[[3]]</code></pre>
+<pre><code>## [[1]]
+## [1] 1
+## 
+## [[2]]
+## [1] 2
+## 
+## [[3]]
+## [1] 3</code></pre>
+<pre><code>## [1] 1 2 3</code></pre>
+<pre><code>## [1] &quot;1&quot; &quot;2&quot; &quot;3&quot;</code></pre>
+<pre class="r"><code>f[[1]][[1]] + f[[1]][[2]] + f[[1]][[3]]</code></pre>
+<pre><code>## [1] 6</code></pre>
+<pre class="r"><code>sum(f[[2]])</code></pre>
+<pre><code>## [1] 6</code></pre>
+<p>Novamente utilizamos caminhos distintos para chegar no mesmo resultado, busque entender por onde cada um deles passou.</p>
+<ul>
+<li><code>$</code> - Nome da coluna ou elemento da lista.</li>
+</ul>
+<pre class="r"><code>g[,1] ; g$V1
+
+f[[3]] ; f$strings
+
+f$lista[[1]] + f$lista[[2]] + f$lista[[3]]</code></pre>
+<p>Quando estamos fazendo o <em>subsetting</em> podemos utilizar tanto de <em>inteiros</em> positivos (negativos) para definir quais posições serão obtidas (retiradas), quanto de valores lógicos (<code>T</code> ou <code>F</code>), nesse caso <strong>R</strong> nos retorna todos os elementos para os quais há uma correspondência com <code>TRUE</code>. Nos exercícios você poderá testar esses outros tipos de definições.</p>
+</div>
+<div id="exercícios" class="section level3">
+<h3>Exercícios</h3>
+<ol style="list-style-type: decimal">
+<li><p>Muitas vezes é necessário termos uma sequência de números, seja porque queremos avaliar o valor da função nesse inverlo, seja porque precisamos estabelecer uma ordem de comandos. Reproduza o vetor <code>c</code> usando as funções <code>:</code>, <code>seq()</code> e <code>seq_along()</code>.</p></li>
+<li><p>Quando temos dúvidas sobre uma determinada função podemos consultar o <code>Help</code> por dois métodos, ou damos <code>Ctrl + Enter</code> em <code>?função</code> ou podemos apertar <code>F1</code> ao final do nome. Veja algumas diferenças entre o <em>tipo</em> de um objeto e a <em>classe</em> consultando a ajuda dessas duas funções. (Compare em especial <code>f</code>, <code>g</code>, <code>d</code>)</p></li>
+<li><p>Um dos atributos que podem ser atribuídos são os nomes das dimensões. Descubra qual função permite obtermos esses nomes, em seguida crie uma matriz que reproduza o primeiro elemento de <code>e</code> usando as funções <code>colnames()</code> e <code>rownames()</code>.</p></li>
+<li><p>O tamanho de cada <em>classe</em> de objeto é entendida de forma distinta. Utilize a função <code>length()</code> para entender essa mensuração para <code>c</code>, <code>d</code>, <code>f</code> e <code>g</code>. Qual a lógica para cada um?</p></li>
+<li><p>Um outro tipo de varíavel muito importante são as categóricas, aquelas variáveis discretas que representam qualidades distintas (podendo ou não serem ordenadas). Sabendo que hoje no Brasil 30% da PEA tem emprego formal, 40% informal e 30% são trabalhadores por conta própria utilize as funções <code>factor</code> e <code>sample</code> para criar um vetor de 200 observações identificando as três categorias com essa distribuição. (Depois analise o <em>tipo de informação</em> e a <em>classe</em> desse vetor)</p></li>
+<li>Para praticar um pouco do <em>subsetting</em>:</li>
+</ol>
+<ol style="list-style-type: lower-alpha">
+<li>Some os números do terceiro elemento de <code>f</code> usando a função <code>sum()</code></li>
+<li>Crie uma <em>string</em> <code>&quot;ab&quot;</code> a partir do segundo elemento de <code>f</code> com a função <code>paste()</code></li>
+<li>Obtenha os elementos da primeira e da última linha de <code>g</code> usado a função <code>nrow()</code>. Qual função você poderia usar para obter a primeira e a última coluna?</li>
+</ol>
+</div>
+<div id="bibliografia" class="section level3 unnumbered">
+<h3>Bibliografia</h3>
+<div id="refs" class="references">
+<div id="ref-grolemund2014">
+<p>Grolemund, Garret. 2014. <em>Hands-on Programming with R</em>. O´Rielly. <a href="https://rstudio-education.github.io/hopr/" class="uri">https://rstudio-education.github.io/hopr/</a>.</p>
+</div>
+<div id="ref-wickham2019">
+<p>Wickham, Hadley. 2019. <em>Advanced R</em>. 2nd ed. Chapman &amp; Hall’s R Series. <a href="https://adv-r.hadley.nz/index.html" class="uri">https://adv-r.hadley.nz/index.html</a>.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Esse é o nome dado aos resultados das nossas ações, geralmente mostrados no <em>Console</em>.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>A função <code>print()</code> serve para exibirmos no console algo de interesse, como a etapa de uma outra função. Acontece que acabamos ``<em>abrasileirando</em>’’ o termo e muitas vezes se diz <em>printar</em> o resultado.<a href="#fnref2">↩</a></p></li>
+</ol>
 </div>
 
 
