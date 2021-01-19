@@ -1,0 +1,316 @@
+---
+title: "Aula 1"
+author: "Matias Cardomingo"
+output: html_document
+bibliography: aula.bib
+---
+
+## Introdução ao R
+
+**R** é uma linguagem usada entre humanos (especialmente entre você e algum você do futuro) e, principalmente, entre humanos e máquinas. Seu nome tem duas motivações, uma para homenagear seus desenvolvedores da Universidade de Auckland, na Nova Zelândia, *Ross Ihaka* e *Robert Gentleman*; enquanto a outra é a referência à linguagem **S**, a partir da qual o **R** foi desenvolvido. Desde 1995 ele integra o *Projeto GNU*, responsável por reunir *softwares livres* que se opõem aos softwares de assinatura paga - no caso da economia temos principalmente o *Stata* e o *E-Views*. O uso dessa linguagem tem algumas vantagens, em primeiro lugar, ela é grátis e colaborativa (tal como os demais *softwares livres*); em segundo lugar, ela é largamente usada para desenvolver análises estatísticas e, por isso, possui uma série de ferramentas (*pacotes*) já desenvolvidas ao longo de bastante tempo e por muitas mãos que sempre podemos usar.
+
+O **R Studio** é uma interface amigável, criada para facilitar o uso dessa linguagem. Do lado esquerdo superior temos o *script*, no qual escrevemos os comandos e abaixo dele está o *console*, responsável por executar esses comandos. Já do lado direito nós temos, na parte superior, a listagem de todos os *objetos* (vamos voltar a eles em breve) armazenados no *ambiente global*, ou seja, tudo aquilo que estamos utilizando e já foi armazenado pelo programa. Por fim, na parte inferior direita nós temos uma espécie de vizualizador, no qual podemos ver a descrição dos comandos, nosso gráficos, entre outras coisas.
+
+### Objetos
+
+*John Chambers*, um dos responsáveis pelo desenvolvimento da linguagem **S**, disse que duas frases são muito úteis para se pensar progrmação em **R**: "Tudo que existe são *objetos* e tudo que acontece é ação de uma *função*". Por exemplo, vamos criar o *objeto* `a` digitando o código a seguir no *script*, selecionando esse trecho com o cursor e apertando `Crtl + Enter`.
+
+```{r I, echo=TRUE}
+
+a <- 5
+b <- 10
+
+```
+
+A definição através da seta `<-` é a mais usual dessa linguagem, embora funcione usar `=`. Veja agora que o **R** passa a entender `a` como 5.
+
+```{r II, echo=TRUE}
+
+a + 10
+a + b
+b - 10
+a*2 - b
+
+```
+
+Todas as operações matemáticas usuais irão funcionar normalmente: `+`, `-`, `*` e `/`. Pronto, agora você já sabe como criar um *objeto*, a tarefa mais fundamental na programação em **R**. A centralidade dos *objetos* está no fato dessa linguagem ser entendida como *programação orientada por objetos* (POO). A principal função desse método, segundo @wickham2019 é a possibilidade de um único *objeto* poder ser lido pelo programa, ou impresso no *console* de diferentes formas a depender de suas características e a finalidade da operação, ou seja, a existência de *polimorfismo*. Para isso as chamadas *funções genéricas* atuam de forma diferente conforme as características do *objeto*, principalmente com relação à sua **classe**.
+
+Essa é a principal herança do **R** com relação à linguagem **S**, não à toa os objetos seguem a três estruturas mais comuns: *tipo base*, *S3* e *S4*. As duas últimas são diretamente derivadas do **S** que passou a ter POO a partir de sua terceira versão.
+
+Para tornar o exemplo mais nítido, vamos criar uma nova classe de objetos chamada `"salario"`. Nela definiremos o `valor` recebido, assim como `genero` e `cor`, vamos definir por padrão que `genero = 1` será equivalente a `homem` e `cor = 1` será `branco`.
+
+```{r}
+salario <- function(valor = double(), genero = 1, cor = 1) {
+  
+  stopifnot(is.double(valor))
+  stopifnot(is.integer(cor))
+  stopifnot(is.integer(genero))
+  
+  structure(valor,
+            class = "salario",
+            genero = genero,
+            cor = cor)
+  
+}
+```
+
+Agora peça para o **R** imprimir no console o objeto `hom.bra` com `valor = 1500`, `genero = 1` e `cor = 1`. A fim de comparação, nós vamos entender se há alguma diferença entre a *função genérica* `print()` para imprimir `a` e `hom.bra`. Para isso teremos que instalar um pacote com um novo conjunto de funções, é bastante simples:
+
+```{r, error=TRUE, results='hide', message=FALSE, warning=FALSE}
+install.packages("sloop")
+```
+
+Agora vamos chamar esse pacote para ser usado:
+
+```{r, results='hide', warning=FALSE}
+library(sloop)
+```
+
+Repare que na primeira função usamos `""`, diferente da segunda. Enquanto a primeira busca nos arquivos do **CRAN** o pacote `sloop`, a segunda apenas ativa ele nessa sessão do **R**. Muito bem, agora vamos finalmente identificar se há alguma diferença em imprimir `a` ou `hom.bra`.
+
+```{r, results='hide', error=TRUE, warning=FALSE, message=FALSE}
+a ; sloop::s3_dispatch(print(a))
+
+hom.bra ; sloop::s3_dispatch(print(hom.bra))
+```
+
+Note que para ambos vemos `=> print.default`, ou seja, a função `print()` padrão é aquela utilizada na impressão. Contudo, podemos notar que o **R** buscou uma função específica para a **classe** `"salário"`, indicada por `print.salario`. Essa característica que é chamada como *despacho de método*, ou seja, as funções possuem *métodos* distintos conforme as **classes** dos objetos e nesse caso a função `print()` estava buscando um método adequado para aquela **classe**. Todos esses elementos são um tanto avançados para quem está começando no **R**, mas servem para te dar uma leve impressão de como as coisas funcionam por dentro da máquina que você está aprendendo a dialogar.
+
+Por fim, vamos brevemente mostrar como podemos ensinar um método de `print()` para nossa classe específica. 
+
+```{r}
+print.salario <- function(x) {
+  
+  print(paste("Salário de R$", x[1], 
+              "de", c("homem", "mulher")[attr(x, "genero")], 
+              "da cor", c("branca", "negra")[attr(x, "cor")]))
+  
+}
+```
+
+Experimente agora buscar qual *método* será despachado para imprimir `a` e `hom.bra`. No restante dessa aula, você irá aprender alguns elementos básicos sobre a maneira que o **R** organiza nossos dados. 
+
+### Dados
+
+Os *objetos* responsáveis por armazenar nossos dados podem ser descritos por duas características principais:
+
+1) Dimensão - 1d, 2d e etc
+2) Tipo de informação - homogêna ou heterogênea
+
+#### Vetores (1d - homogêneo)
+É o objeto mais simples do R, armazena apenas um tipo de informação em uma estrutura unidimensional. Eles são formados individuamente pelo comando `c()`, de *concatenate*.
+
+```{r}
+c <- c(a, 6, 7, 8, 9, b)
+```
+
+Para identificar o tipo de informação armazenado pelo vetor podemos utilizar o comando `typeof()`. Também é possível sabermos quantos elementos compõe o vetor através do comando `length()`.
+
+```{r, echo=FALSE}
+typeof(c)
+length(c)
+```
+
+O tipo `"double"` indicado para o vetor `c` referem-se aos números normais, assim como o `"numeric"`. Os demais tipos são:
+
+* `"integer"` - inteiros, diferenciam-se dos dois anteriores por não considerarem os irracionais
+
+* `"character"` - textos, o elemento individual chama-se *string*
+
+* `"logical"` - `TRUE` ou `T` e `FALSE` ou `F`
+
+E outros dois menos usados no dia a dia.
+
+* `"complex"` - números complexos
+
+* `"raw"` - bytes puros de informação, veja digitando `raw(3)`
+
+A ordem de complexidade de cada um dos tipos, ou seja, o espaço de armazenamento que cada um deles exige é:
+
+`"logical" < "integer" < "double" < "character"`
+
+#### Matrizes (2d - homogêneo)
+São formadas a partir de um conjunto de *vetores*, sendo que todos devem conter um único tipo de informação. Podemos formar matrizes unindo vetores:
+
+```{r}
+d <- cbind(a:b, c)
+
+f <- rbind(a:b, c)
+```
+
+Ou construindo a partir da função `matrix()`:
+
+```{r}
+g <- matrix(data = c(a:b, c), 
+            nrow = 6, 
+            ncol = 2)
+```
+
+Repare que todos esses *objetos* que criamos ficaram separados dos demais na listagem de objetos do *Global Environment*. Eles estão sob a categoria *data*, pois começarama tomar a forma de uma base de dados, como vamos usar mais para frente. 
+
+Para conseguir identificar a estrutura dessas informações o **R** classifica as diferentes *classes* dos objetos. Note:
+
+```{r, results = 'hide'}
+class(d) ; class(f) ; class(g)
+
+class(a); class(b) ; class(c)
+```
+
+Ou seja, os *objetos* `a`, `b` e `c` são entendidos apenas como informações, ou valores, enquanto `d`, `f` e `g` são estruturas de dados. Ainda que o tipo de informação contida em cada um deles seja exatamente o mesmo. 
+
+Agora, o que acontece se criamos uma matriz misturando informações de diferentes tipos?
+
+```{r}
+h <- matrix(data = c(c, rep("String", 6)),
+            nrow = 6,
+            ncol = 2)
+```
+
+Repare que a *classe* de `h` segue sendo `"matrix"`, mas as informações foram todas transformadas em `"character"`. Isso se deve ao nível de complexidade das informações, o **R** sempre transforma as informações mais simples na mesma estrutura das mais complexas. É preciso estarmos alerta para isso, pois nem todas as operações podem ser feitas com todos os *tipos* de dados, por exemplo:
+
+```{r, error=TRUE}
+"1" + "2"
+```
+
+#### Array (nd - homogêneo)
+Essa estrutura consiste em uma série de matrizes, como se fossem várias camadas, por isso ela é n-dimensional. 
+
+```{r}
+e <- array(cbind(c,a:b), 
+           dim = c(3,2,3), 
+           dimnames = list(c("topo", "meio", "baixo"), 
+                           c("esq", "dir")))
+```
+Agora vamos apresentar as estruturas de dados mais comuns no dia a dia da pesquisa, por conterem *tipos* de informações variadas. 
+
+#### Lista (nd - heterogêneo)
+Trata-se de um conjunto de quaisquer objetos, apesar de sua estrutura parecer um pouco estranha à primeira vista, aos poucos vamos percebendo muitas funcionalidades.
+
+```{r}
+f <- list(lista = list(1,2,3),
+          vetor = c(1,2,3),
+          strings = paste(1:3))
+```
+
+Repare nas diferenças de *outputs*[^1] quando mandamos imprimir a lista `f`, afinal, temos pelo menos uma lista chamada `lista` dentro de `f`. Por fim, vamos à estrutura de dados mais comum em pesquisas.
+
+#### Data frame (2d - heterogêneo)
+Novamente temos um conjunto de vetores, como ocorria com as matrizes, mas nesse caso os vetores podem conter tipos de informações distintas. Por isso que o *tipo* dos data frames será sempre indicado como `"list"`, embora eles pertençam a uma *classe* própria dos data frames.
+
+```{r}
+g <- data.frame(d)
+```
+
+Repare que ao criarmos o objeto `g` através de `d` a primeira coluna ganhou o nome `"V1"`, enquanto a segunda coluna manteve o nome que já possuia. Saber esse tipo de transformação é importante para conseguirmos mais tarde selecionar os dados da forma correta. 
+
+Agora que já conhecemos todas as estruturas de dados que compõem o **R**, vamos avançar sobre outras características dos dados. 
+
+### Atributos
+
+Esses funcionam como uma espécie de *meta-dados*, são informações adicionais que descrevem outras características de nossos dados. No caso de `hom.bra`, por exemplo, temos `cor` e `genero`. Também podemos definir esses atributos de forma mais direta:
+
+```{r}
+attr(e, "nome") <- "teste"
+```
+
+Nesse caso nós criamos um novo atributo para `e` e estabelecemos que essa informação seria chamada por `"nome"`. Acontece que esse objeto, ao ser formado, já possui alguns atributos próprios, como suas *dimensões* (obtida através da função `dim()`) e sua *classe* (essa você já conhece). Há várias outras formas de se estabelecer nomes, contudo, por ser uma linguagem usada no mundo todo, o mais usual é que se use `"name"`. 
+
+```{r, results='hide'}
+nomes <- c(nome1 = 1, nome2 = 2)
+names(nomes) <- c("nome3", "nome4")
+setNames(nomes, c("nome5", "nome6"))
+```
+
+Finalmente, vamos ao último tópico desta introdução e um dos pontos mais importantes nas linguagens de programação. 
+
+### Acessando informações ou *subsetting*
+
+Com apenas 3 comandos somos capazes de vasculhar todas as informações que precisamos em nossas estruturas de dados e, aos poucos, vamos entendendo como combinar essas instruções. 
+
+* `[]` - Esse comando permite buscarmos elementos pela sua posição ou pelo nome, sendo que podemos fornecer instruções referentes ao número de dimensões do *objeto*. Logo, podemos buscar elementos de matrizes utilizando um indicador para linha e outro para coluna.
+
+
+```{r, results='hide'}
+c[1] + c[length(c)]
+
+h[c(6,12)] ; h[6,c(1,2)]
+
+e[12] ; e[3,2,2] ; e["baixo", "dir", 3]
+```
+
+Tente entender cada um dos comandos acima. *Printe*[^2] cada um dos objetos para comparar com seus resultados. Você consegue dizer se nós estamos buscando o mesmo elemento de `e` para cada um dos comandos?
+
+* `[[]]` - Para acessar elementos das listas tanto pela posição do elemento, quanto pelo seu nome. Vamos usar a única lista que criamos nessa primeira aula `f`. 
+
+```{r}
+f[[1]] ; f[[2]] ; f[[3]]
+
+f[[1]][[1]] + f[[1]][[2]] + f[[1]][[3]]
+
+sum(f[[2]])
+```
+
+Novamente utilizamos caminhos distintos para chegar no mesmo resultado, busque entender por onde cada um deles passou.
+
+* `$` - Nome da coluna ou elemento da lista.
+
+```{r, results='hide'}
+g[,1] ; g$V1
+
+f[[3]] ; f$strings
+
+f$lista[[1]] + f$lista[[2]] + f$lista[[3]]
+```
+
+Quando estamos fazendo o *subsetting* podemos utilizar tanto de *inteiros* positivos (negativos) para definir quais posições serão obtidas (retiradas), quanto de valores lógicos (`T` ou `F`), nesse caso **R** nos retorna todos os elementos para os quais há uma correspondência com `TRUE`. Nos exercícios você poderá testar esses outros tipos de definições.
+
+[^1]: Esse é o nome dado aos resultados das nossas ações, geralmente mostrados no *Console*.
+[^2]: A função `print()` serve para exibirmos no console algo de interesse, como a etapa de uma outra função. Acontece que acabamos ``*abrasileirando*'' o termo e muitas vezes se diz *printar* o resultado.
+
+### Exercícios
+
+1. Muitas vezes é necessário termos uma sequência de números, seja porque queremos avaliar o valor da função nesse inverlo, seja porque precisamos estabelecer uma ordem de comandos. Reproduza o vetor `c` usando as funções `:`, `seq()` e `seq_along()`.
+
+2. Quando temos dúvidas sobre uma determinada função podemos consultar o `Help` por dois métodos, ou damos `Ctrl + Enter` em `?função` ou podemos apertar `F1` ao final do nome. Veja algumas diferenças entre o *tipo* de um objeto e a *classe* consultando a ajuda dessas duas funções. (Compare em especial `f`, `g`, `d`)
+
+3. Um dos atributos que podem ser atribuídos são os nomes das dimensões. Descubra qual função permite obtermos esses nomes, em seguida crie uma matriz que reproduza o primeiro elemento de `e` usando as funções `colnames()` e `rownames()`.
+
+4. O tamanho de cada *classe* de objeto é entendida de forma distinta. Utilize a função `length()` para entender essa mensuração para `c`, `d`, `f` e `g`. Qual a lógica para cada um?
+
+5. Um outro tipo de varíavel muito importante são as categóricas, aquelas variáveis discretas que representam qualidades distintas (podendo ou não serem ordenadas). Sabendo que hoje no Brasil 30% da PEA tem emprego formal, 40% informal e 30% são trabalhadores por conta própria utilize as funções `factor` e `sample` para criar um vetor de 200 observações identificando as três categorias com essa distribuição. (Depois analise o *tipo de informação* e a *classe* desse vetor)
+
+6. Para praticar um pouco do *subsetting*: 
+  a. Some os números do terceiro elemento de `f` usando a função `sum()`
+  b. Crie uma *string* `"ab"` a partir do segundo elemento de `f` com a função `paste()`
+  c. Obtenha os elementos da primeira e da última linha de `g` usado a função `nrow()`. Qual função você poderia usar para obter a primeira e a última coluna?
+
+### Referências
+
+```{r, include=FALSE}
+# FALTA INCLUIR
+
+# Criar a mesma sequência através do comando ":"
+## ! ## Reproduza essa sequência utilizando o comando seq()
+# Para buscar ajuda escreva o comando desejado e pressione "F1" ou "Fn + F1"
+
+# Note: "classe" = estrutura da base de dados x "tipo" = informação contida no vetor
+
+## ! ## Utilize as funções rownames() e colnames() para criar uma matriz igual
+# ao primeiro elemento de "d"
+
+## usar length() para diferentes tipos de objetos
+
+### Variáveis categóricas: factors ###
+
+# São integers com dois atributos
+# class = "factor"
+# levels = valores possíveis de serem assumidos
+
+## ! ## Some os três números do terceiro elemento de "f" com a função sum()
+#sum(f[[3]])
+## ! ## Crie uma string "ab" a partir do segundo elemento de "f" com a função paste()
+#paste(f$a[1], f$a[2], sep = "")
+## ! ## Retire os elementos da primeira e da última linha de "d"
+#d[c(1,6),]
+```
+

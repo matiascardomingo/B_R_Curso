@@ -1,0 +1,74 @@
+---
+title: "Aula 1"
+author: "Matias Cardomingo"
+date: "19 de janeiro de 2021"
+output: 
+  ioslides_presentation:
+    # incremental: true (aparição gradual)
+    transition: faster
+    logo: logo-iree.png
+---
+
+```{r, include=FALSE}
+# pagedown_chrome_print() - imprimir Rmd e HTML para PDF
+
+# Inserir imagem data-background=logo-iree.png data-background-size=cover
+
+# Separação de texto
+# ### <b> (início) e ### </b> (final) : negrito
+
+# <div class = MODO> (início) </div> (final)
+# MODOS:
+# "centered" - centralizado
+# "columns-2" 
+# "red", "blue", "green", "gray", "yellow"
+# "notes" - acrescenta notas para o modo (acrescentar na URL: my-presentation.html?presentme=true)
+
+# Atributos
+# {.build}: transition para o slide
+# {.smaller}: texto menor
+# {.flexbox .vcenter}: texto centralizado
+```
+
+# B_R - Introdução ao R para análise de dados econômicos do Brasil
+
+## Objetivo e plano 
+
+<div class="notes">
+
+Isso a Globo não mostra.
+
+</div>
+
+- Introduzir conceitos básicos (e alguns avançados) de programação em **R** para produção de análises econômicas
+
+- **Plano de aulas**
+  1. Introdução à programação - Parte 1
+  2. Introdução à programação - Parte 2
+  3. Uso de microdados (PNAD Covid?)
+  4. Introdução à econometria - Painel
+  5. Acessando dados de Brasil no R
+  6. Introdução à econometria - Séries de tempo
+  
+## Programação e linguagem
+
+- Por que dizemos que aprendemos uma linguagem?
+
+- Onde essa conversa tem nos levado?
+  - Kosinski (2021): ["Nós nunca entenderemos a inteligência artificial"](https://link.estadao.com.br/noticias/cultura-digital,nunca-entenderemos-a-inteligencia-artificial-diz-profeta-do-escandalo-do-facebook,70003582406)
+  - Sua cara diz sua posição posição política? [Em 75% das vezes, sim](https://www.nature.com/articles/s41598-020-79310-1) 
+  - [Cambridge Analytica](https://www.pnas.org/content/pnas/110/15/5802.full.pdf)
+
+## Instalando o R | Começando pelo começo {.build}
+
+>- O **R** foi desenvolvido na Nova Zelândia em 1991, a partir da linguagem de programação **S**
+
+>- Veio a público em 1993 e em 1995 tornou-se um *software livre* parte do *Projeto GNU*
+
+>- Em 1997 tem início o *Comprehensive R Archive Network* (CRAN)
+
+**Programa R**
+   - [CRAN](https://cran.r-project.org/)
+
+**Interface**
+   - [RStudio](https://rstudio.com/products/rstudio/download/#download)
