@@ -4,4 +4,4 @@ Na segunda aula nós continuamos a introdução à linguagem de programação co
 
 Para além disso, também apresentamos os chamados **valores booleanos** ou **lógicos**, assim como as **operações booleanas**. 
 
-O material para a aula está nesse [link](https://matiascardomingo.github.io/B_R_Curso/Aula-2.html) e o código em R [nesse](https://github.com/matiascardomingo/B_R_Curso/blob/main/Scripts/Aula%201.Rmd). 
+O material para a aula está nesse [link](https://matiascardomingo.github.io/B_R_Curso/Aula-2.html) e o código em R [nesse](https://github.com/matiascardomingo/B_R_Curso/blob/main/Scripts/Aula%202.Rmd). 
