@@ -1,0 +1,339 @@
+---
+title: "Aula 2"
+author: "Matias Rebello Cardomingo"
+output: 
+  html_document:
+    css: "style.css"
+bibliography: "aula2.bib"
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+</style>
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Introdução ao R - Parte 2
+
+Nessa segunda (e última) aula de introdução à programação vamos trabalhar com aquilo que as máquinas fazem de melhor no nosso lugar: atividades repetidas. Para isso vamos nos familiarizar com duas noções importantes na programação: o **loop**, as **funções condicionais** e a ideia de **programação funcional**, que fundamenta o funcionamento do **R** segundo @wickham2019. 
+
+Se você pesquisar no Google Tradutor o significado de **loop** (fala-se *lup*) ele responderá como opção principal **ciclo**. Essa tradução nos auxilia um bom tanto a entender o que são os **loops**, pois eles contituem exatamente a determinação de uma regra para que a linguagem execute um mesmo comando repetidas vezes. Talvez você já tenha ouvido falar, por exemplo, dos `for` **loops**, nos quais definimos que a regra é ele seguir uma série de elementos (sejam números de uma sequência, ou nomes de partes de uma lista).
+
+### `for` **loop**
+
+Para que fique um pouco mais nítido do que estamos falando, vamos executar um primeiro **ciclo**.
+
+```{r}
+for(numero in 1:10) numero + 5
+```
+
+Você entendeu o que aconteu? Provavelmente, não, pois não apareceu nada no seu console, certo? Isso acontece porque a execução do **ciclo** (assim como as funções) gera um *ambiente* próprio no qual ele executa esse comando, porém, a atribuição de um valor para a variável `numero` é feita também no **Global Environment**, por isso vemos `numero` aparecer como um valor listado igual a `10`. Esse foi o último valor que ele assumiu, depois de ter passado por todos da sequência de `1` a `10`. 
+
+Pois bem, aqui volta a ser importante a função `print()` que discutimos na última aula. Com ela podemos ver o que está acontecendo por dentro do **ciclo**.
+
+```{r, results='hide'}
+for(numero in 1:10) print(numero + 5)
+```
+
+Ou então, assim como a variável `numero` fica copiada ao **Global Environment**, podemos definir um vetor de `resultados` no qual vamos armazenar todas as somas feitas dentro do **ciclo**. Note, nesse caso, que o vetor `resultados` acaba por ter a ordem inversa das somas, justamente porque estamos agregando cada elemento de forma sequencial. Agora, como nós poderíamos utilizar a própria atribuição de valores a `numero` para fazer com que `resultados[1]` fosse `6` ao invés de `15`?
+
+```{r, results='hide'}
+resultados <- c()
+
+for(numero in 1:10) resultados <- c(numero + 5, resultados)
+```
+
+Nesse caso estamos criando uma sequência para que a operação de soma seja reproduzida de forma sequencial. Mas vamos utilizar o **ciclo** para executar uma mesma análise de dados de uma série de variáveis. Para isso, vamos utilizar a Pesquisa Industrial Mensal (PIM) do IBGE através do pacote `sidrar`, que nos permite interagir com a API[^1] do [Sidra](https://sidra.ibge.gov.br/). Instale o pacote para que você possa utilizar as funções.
+
+```{r, eval=FALSE}
+install.packages("sidrar")
+```
+
+A utilização do pacote[^2] é bastante fácil, há uma função feita para que você entenda a maneira como o Sistema Sidra do IBGE armazena as séries. Buscando no site do Sidra podemos ver que o número da série com os dados da PIM é `3653`.
+
+```{r, eval=FALSE}
+sidrar::info_sidra(3653, wb = T)
+```
+
+Responda a pergunta que apareceu em seu console com um `y` e aperte `Enter` para que abra a página do Sidra com as informações. É possível também não utilizar o argumento `wb =`, nesse caso as opções da série serão impressas no console, a diagramação online é mais bonita e intuitiva, mas caso você já esteja acostumado, ver as informações no console pode ser mais rápido. 
+
+<div class = "bloco">
+
+<div class = "center">
+**Invocando pacotes**
+</div>
+
+Você reparou que nós não utilizamos a função `library()` para invocar o pacote `sidrar`? Nesse caso nós apenas utilizamos o comando `sidra::` e selecionamos a função que desejávamos. Por vezes, escrever o código dessa forma pode facilitar você entender quais recursos está utilizando e de onde veio cada um deles.
+
+</div> 
+
+Agora para obtermos as variáveis temos que inserir essa série de argumentos que estão sendo mostrados no site. Não é muito simples entender como eles funcionam, por isso, vamos utilizar o máximo de opções possíveis para aprendermos como extair informações dessa fonte. Escolhemos aqui utilizar o índice dessazonalizado da produção de cinco setores, conforme descritos nos comentários do código - crie o hábito de fazer anotações como essas, elas contribuem bastante para entendermos o que cada etapa significa. 
+
+```{r}
+pim <- sidrar::get_sidra(3653, # x = série a ser obtida
+                  variable = 3135, # Índice dessazonalizado com média de 2012 = 100
+                  period = "200201-202011", # Início e fim da amostra "AAAAMM-AAAAMM"
+                  classific = "C544", # Escolher setores específicos
+                  category = list("C544" = c(129315, 129330, 129333, 129335, 129337)), # Extrativa / Farmoquímicos e Farmacêuticos / Metalurgia / Informática / Máquinas e equipamentos
+                  geo = "State", # Escolher UF
+                  geo.filter = list("State" = c(31, 15, 43, 35)))  # MG / PA / RS / SP  
+```
+
+Veja o tamanho dos dados que acabamos de obter, sem dúvida é o maior objeto que já usamos até aqui. De início, vamos identificar quais são nossas variáveis e ver as primeiras observações delas.
+
+```{r, results='hide'}
+colnames(pim); head(pim)
+```
+
+Repare que muitas das variáveis parecem, na verdade, não ter variação alguma dentro delas, por exemplo as que indicam o `"Nível Territorial"`. Para saber quais valores cada uma delas apresentam podemos utilizar novamente de um **ciclo**, pedindo que ele nos indique quantos valores diferentes temos em cada uma das colunas.
+
+```{r, results='hide'}
+for (variavel in colnames(pim)) { 
+  
+  print(paste(variavel, "possui", length(unique(pim[,variavel])), "valores distintos"))
+  
+  }
+```
+
+Note que nós temos observações indicando 4 estados, 227 meses e 5 atividades conforme pedimos, além da última coluna que nos trás o valor do índice para cada um dos meses, setores e estado. Todas as demais observações são compostas por um único valor. Vamos então criar uma maneira de excluir todas as colunas formadas por um único valor usando o *subsetting* visto na última aula.
+
+```{r, results='hide'}
+unico <- c()
+
+for (icol in 1:length(pim)) unico <- c(unico, length(unique(pim[,icol])) == 1)
+```
+
+Agora pare um momento para entender o que acabamos de fazer. Em primeiro lugar, note que mudamos a maneira como vamos chamar cada uma das colunas de nossa base dados. Ao invés de usarmos o nome da variável, estamos utilizando um indice para cada coluna. Em segundo lugar, repare a maneira como identificamos as colunas compostas por um único valor: nós mensuramos o tamanho do vetor de valores únicos e verificamos se ele equivale exatamente a `1` utilizando `==` para obter, por fim, um vetor de *tipo* `logical`.
+
+<div class = "bloco">
+
+<div class = "center">
+**Operadores *booleanos* - Parte 1**
+</div>
+
+Essas são os operadores responsáveis por executar funções e nos retornar se a condição que estabelecemos é válida ou não através de um valor lógico `TRUE` (verdadeiro) ou `FALSE` (falso), também chamados por *valor booleano*. No caso acima gostaríamos de saber quais colunas possuiam apenas um único valor, assim comparamos `length(unique(coluna)) == 1`. Mas poderíamos também ter buscado aquelas com valores maiores (`>`), menores (`<`) ou simplemente diferentes (`!=`) de `1`. Só é preciso tomar cuidado para não utilizar apenas um símbolo `=` quando queremos encontrar identidades, pois isso é lido como atribuição de valor.
+
+</div> 
+
+Agora que definimos quais são as colunas que não nos trazem informações, podemos manter apenas aquelas com variação em suas linhas e observar os novos valores. Note que, como buscamos aquelas colunas com valores maiores que `1`, vamos utilizar um novo *operador booleano*, o `!` definido como "não", ou uma espécie de "ao contrário", ele inverte todos os *valores booleanos* do vetor. (Evidente que o mais fácil teria sido desde o início captarmos quais colunas possuiam mais de um valor único, mas nesse caso há um fim didático em aprendermos novos comandos. Experimente *printar* no console `unico` e `!unico`.)
+
+```{r, results='hide'}
+pim <- pim[,!unico]
+
+head(pim)
+```
+
+Como você pode ver, agora reduzimos nossas variáveis para apenas `r length(pim)` colunas, sendo que 3 informações ainda estão repetidas, mas identificadas de forma diferente entre as variáveis: o estado, o mês de coleta e o setor de atividade. Acontece que se olharmos para a última coluna vamos notar junto aos números valores iguais a `NA`. Isso nos indica que temos observações faltantes, para identificá-las sempre podemos utilizar da função `is.na()`, que nos retorna um vetor de *valores booleanos* da mesma magnitude do vetor de interesse. 
+
+Agora vamos analisar algumas estatísticas descritivas dos índices que obtivemos. Há inúmeras maneiras de se fazer isso no **R**, especialmente com pacotes que nos fornecem tabelas formatadas, mas nessa aula vamos seguir utilizando as ferramentas que conhecemos, a fim de nos aprofundarmos no uso delas e entedermos seu funcionamento. A função que usaremos para obter essas estatísticas é a função `summary()`, que nos retorna o valor mínimo e máximo do vetor, sua média além do primeiro e do terceiro quartis. Todas essas coisas podem ser obtidas individualmente através de funções específicas. 
+
+Vamos obter essas informações de forma separada, antes de montarmos uma tabela única para todos os estados. Para isso, vamos primeiro separar todos os valores referentes à Indústria Extrativa de Minas Gerais, os primeiros elementos de `unique(pim$Seções e atividades industriais (CNAE 2.0) (Código))` e `unique(pim$Unidade da Federação)`, respectivamente.
+
+```{r, results='hide'}
+info.MG.Ext <- pim$Valor[pim$`Unidade da Federação` == "Minas Gerais" & 
+                                pim$`Seções e atividades industriais (CNAE 2.0)` == "2 Indústrias extrativas" &
+                                !is.na(pim$Valor)] 
+
+# Dados de summary()
+min(info.MG.Ext); quantile(info.MG.Ext, .25); median(info.MG.Ext); mean(info.MG.Ext); quantile(info.MG.Ext, .75); max(info.MG.Ext)
+
+# Última informação do vetor
+info.MG.Ext[length(info.MG.Ext)]
+```
+
+Com essas informações podemos notar que o nível de atividade no setor registrado em Novembro de 2020, nosso último período analisado, está mais próximo da mínima histórica do que da média da série e praticamente em 50% do máximo da capacidade já atingida. 
+
+<div class = "bloco">
+
+<div class = "center">
+**Operadores *booleanos* - Parte 2 **
+</div>
+
+Para construir o *subset* `info.MG.Ext` da nossa base de dados nós utilizamos de uma combinação de **valores booleanos** através do operador `&`, que significa exatamente "e", em oposição ao operador `|` que representa "ou". Esses operadores são úteis quando desejamos fazer uma combinação de condições, como no caso acima em que desejávamos separar estados `&` setores `&` apenas valores diferentes de faltantes. Nessas combinações valem as regras da lógica em que o "ou" assume o papel *inclusivo*, ou seja, se apenas uma das afirmações é verdeira, toda a sentença é verdadeira. Um quadro resumo dessas relações pode ser escrito da seguinte forma:
+
+<div class = "center centralizado">
+| 1º Elemento | Operador | 2º Elemento | Resultado | 
+|:-----:|:-----:|:-----:|:-----:|
+| `T` | `&` | `F` | `F` |
+| `F` | `&` | `F` | `F` |
+| `T` | `&` | `T` | `T` |
+| `T` | `|` | `F` | `T` |
+| `T` | `|` | `T` | `T` |
+| `F` | `|` | `F` | `F` |
+</div>
+
+</div> 
+
+Na construção de `info.MG.Ext` nós acabamos por excluir direto na seleção dos dados aqueles que estavam faltando. Mas é bastante comum também tratarmos desses dados na funções específicas que desejamos aplicar. Geralmente o argumento das funções responsáveis por isso é o `na.rm =` (`NA` *remove*) que aceita valores lógicos de `T` ou `F`. Agora, se quisermos obter as mesmas estatísticas descritivas de todos os estados e setores com esse mesmo método, teríamos que criar 20 objetos `info.UF.Setor` (4 UF x 5 setores). Ao invés disso podemos fazer **ciclo** duplo, em que no primeiro identificamos cada estado e no segundo cada setor industrial que selecionamos.
+
+```{r, results='hide'}
+estat <- data.frame()
+
+for (UF in unique(pim$`Unidade da Federação`)) {
+  
+  for (setor in unique(pim$`Seções e atividades industriais (CNAE 2.0) (Código)`)) {
+    
+    info <- summary(pim$Valor[pim$`Unidade da Federação` == UF & 
+                                pim$`Seções e atividades industriais (CNAE 2.0) (Código)` == setor &
+                                !is.na(pim$Valor)])
+    
+    setor.UF <- cbind(data.frame(UF = UF, Setor = setor),
+                      matrix(info,
+                             nrow = 1,
+                             dimnames = list(NULL, c(names(info)))))
+                                       
+    
+    estat <- rbind(estat, setor.UF)
+    
+  }
+  
+}
+```
+
+Nesse **ciclo** nós forçamos a geração de uma tabela descritiva a partir da função `summary()`. Essa função, assim como a `print()` é uma **função genérica**, tal como vimos na aula passada. Portanto, ela aplica um *método* distinto para cada *classe*. Se quisermos identificar qual método foi utilizado nesse caso podemos utilizar a função vista na aula passada `sloop::s3_dispatch(summary(info))`. No caso dos vetores numéricos, como esse que obtivemos extraindo o valor do índice para cada estado e setor, ela calcula algumas estatísticas descritvas. Já quando estamos trabalhando com regressões lineares através da função `lm()` (de *linear model*), por exemplo, ela nos retorna os valores dos coeficientes, suas estatísticas de significância entre outras coisas. Mas como ela identifica a *classe* do objeto? Antes de prosseguirmos com nossa análise dos dados industriais, vamos parar um instante para entendermos a função `summary` e aprender outra noção fundamental da programação: as **funções condicionais**. 
+
+### `if()`
+
+Como vimos na última aula, é sempre possível acessar partes do código das funções digitando apenas o nome delas no console - sem os parênteses `()` - e apertando `Enter`. Faça isso com a `summary.default` e olhe com atenção para o código dessa função - que é bastante complexo.
+
+```{r}
+summary.default
+```
+
+Como você pode notar, há várias **funções condicionais** ou `if()` dentro dessa função, exatamente porque `summary()` está buscando a **classe** a qual pertence o objeto que acabamos de fornecer. Cada uma das funções `is.alguma_coisa()` retorna um valor lógico afirmando se o objeto pertence à **classe** `alguma_coisa`. Caso a resposta seja `FALSE`, então a **função condicional** não irá executar a tarefa dentro das chaves (`{}`), caso a resposta seja `TRUE`, então os comandos são aplicados sobre o objeto de interesse. 
+
+No nosso caso, nós podemos indentificar a qual classe pertence o objeto criado para cada estado e cada setor industrial dentro do **ciclo** utilizando a função `class(info.MG.Ext)`. Logo, nas três primeiras funções condicionais `if(is.alguma_coisa(objeto))` a resposta é sempre `F` e a função, portanto, não executa aquilo que está determinado por aquele `if()`, apenas segue adiante. O papel da função `else` (cuja tradução é *caso contrário*) é exatamente dizer o que deve ser executado caso a resposta seja `F`. Em palavras, podemos entender a **função condicional** da seguinte forma:
+
+```{r, eval=FALSE}
+if(condição) {
+  
+  TAREFA1
+  
+} else TAREFA2
+```
+ 
+Agora faça a mesma sequência de identificações quando ordenamos `summary(info.MG.Ext)` da seguinte forma:
+
+```{r, results='hide'}
+is.factor(info.MG.Ext) ; is.matrix(info.MG.Ext) ; is.logical(info.MG.Ext) ; is.numeric(info.MG.Ext)
+```
+Assim, apenas na última identificação temos uma resposta `T`, que permite a execução daquilo que está dentro das chaves `{}`. Nós ainda vamos voltar algumas vezes às funções condicionais, essa foi apenas sua apresentação a elas, e também vamos deixar para que você entenda o que ocorreu após o primeiro `TRUE` nos exercícios. Mas agora vamos retornar à análise das nossas informações industriais. Como podemos ver pela tabela `estat` vários dos setores não apresentam nenhuma observação para alguns estados. 
+
+E se quiséssemos descobrir qual dos setores apresentam informações para todos? Certamente poderíamos montar um novo **ciclo** que nos fornecesse essa informação, mas também podemos utilizar do outro conceito que mencionamos no início da aula, o da **programação funcional**. Esse tipo de programação envolve a interação entre vetores e funções em alguns modos diferentes daqueles que estamos acostumados até aqui, no qual temos vetores como argumentos de funções e o resultado (também chamado por *value* nas páginas de ajuda do **R**) é um novo vetor. O caso mais usual de **programação funcional** trata-se exatamente do uso de **funcionais**, ou seja, funções que levam outras funções como argumentos além dos vetores. 
+
+### Programação funcional
+
+A obtenção de estatísticas descritivas é um caso bastante comum do uso de **funcionais**. Vamos voltar para nosso desafio de descobrir qual setor apresenta informações para todos os estados utilizando esse conceito. Para isso, vamos construir por etapas uma função que nos retornará um único valor lógico indicando se o setor apresenta observações não faltantes para todos os estados. Em primeiro lugar, nós vamos criar uma lista a partir de `estat` em que cada elemento será um setor contendo as estatísticas descritivas dos estados. Em seguida, vamos utilizar uma função como argumento de outra função, para que ela nos retorne se essas estatísticas são iguais a `NA`.
+
+```{r, results='hide'}
+estat.list <- split(x = estat, f = estat$Setor)
+
+lapply(estat.list, is.na)
+```
+
+Muito bem, então podemos entender que a função `is.na()` avalia cada um dos elementos e nos indica se ele é ou não faltante, como havíamos mencionado acima. Acontece que nós gostaríamos de chegar a um valor único, que nos permitisse avaliar de forma mais rápida se temos inforamções sobre o setor para todos os estados. Como podemos observar, nos casos em os valores estão ausentes todas as estatísticas descritvas aparecem como `NA` ou `NaN` (*Not A Number*), assim, nós podemos analisar apenas uma das colunas dessas estatísticas. Para isso, vamos passar a oferecer ao **funcional** uma nova função desenhada por nós mesmos para que a análise dos elementos faltantes seja feita apenas sobre a coluna responsável por armazenar a média (*Mean*). Note que o desenho da função conta com duas etapas, em uma primeira há um *subsetting* da coluna e, em um segundo momento, uma análise dos elementos faltantes. Além disso, é importante notar que o único argumento da função é o componente da lista. 
+
+```{r, results='hide'}
+lapply(estat.list, function(elemento) is.na(elemento$Mean))
+```
+
+Repare que agora nós não temos como argumento do nosso **funcional** uma função já definida pelo **R**, ao invés disso nós dizemos que a função utilizada tem como único argumento o `elemento` (que se refere a cada um dos elementos da lista `estat.list`). Então o **R** deve pegar cada um desses elementos e aplicar o *subsetting* selecionando apenas a coluna da média (`elemento$Mean`). Após ter separado essa coluna, ele deve avaliar se os elementos desse vetor são faltantes ou não. Contudo, nós ainda temos quatro respostas para cada elemento da lista, isso porque nós estamos olhando os estados individualmente. Vamos então pedir para que o **R** avalie em conjunto todos esses valores lógicos, mas antes disso vamos inverter a avaliação dele, para que retorne `TRUE` toda vez que a observação for diferente de `NA`.
+
+```{r, results='hide'}
+lapply(estat.list, function(elemento) !is.na(elemento$Mean))
+```
+Pronto, agora basta que ele junte todos esses valores lógicos em uma única condição.
+
+```{r, results='hide'}
+setores.NA <- lapply(estat.list, function(elemento) all(!is.na(elemento$Mean)))
+```
+
+Note que o resultado da nossa função ainda está em forma de lista, que nem sempre é a melhor forma de trabalhar. Para solucionar isso, podemos utilizar a função `unlist()` - tente entender de que maneira ela armazena as separações entre os elementos. Agora basta buscarmos em nossa lista qual dos setores equivale ao código `129333`.
+
+```{r, results='hide'}
+cbind(unique(pim$`Seções e atividades industriais (CNAE 2.0) (Código)`), 
+      unique(pim$`Seções e atividades industriais (CNAE 2.0)`))
+```
+
+
+<div class = "bloco">
+<div class = "center">
+**Funcionais**
+</div>
+
+A função `lapply()` é uma das mais importantes dentre os funcionais, exatamente porque a divisão por grupos dentro de uma lista é algo prático e que permite manusear cada um deles de forma intuitiva. Contudo, existem outros funcionais muito importantes:
+
+- `apply()`: aplicar uma mesma função sobre uma dimensão do objeto, sobre as linhas (`MARGIN = 1`) ou colunas (`MARGIN = 2`). 
+
+- `vapply()`: possui a vantagem de retornar um vetor, mesmo quando aplicada sobre uma lista, além de permitir que você defina qual será o *tipo* do vetor resultante (*double*, *character* e etc).
+
+- `mapply()`: permite utilizar multiplos argumentos na função a ser implementada.
+
+Outros funcionais pertencentes ao pacote `purrr` também são bastante uteis, mas guardam forte semelhança com esses do pacote `base` que já vem instalado ao **R**. Quando formos analisar esses outros pacotes, falaremos um pouco a respeito.
+</div>
+
+#### Exercícios
+
+**1.** Experimente fazer no console as operações: `T + T`, `T + F` e `F + F`. O que você consegue depreender sobre a forma como o R interpreta esses valores lógicos? Agora utilize esse fato para criar um **ciclo** com `for` que opere sobre a `estat.list` e descubra qual setor apresenta informações para todos os estados. Para isso você fará com que ele some todos os elementos de uma das colunas do elemento após ter aplicado a função `is.na()` - a função `sum()` pode ser útil nessa etapa. Em seguida, peça para ele comparar qual dos setores possui soma igual a zero.
+
+  a. De que forma você pode usar o atributo `names()` para indicar cada um dos setores no vetor produzido pelo seu `for()`. 
+  
+  b. Vou colocar abaixo uma solução para que você possa comparar com a sua. Mas para além disso, vamos também nos familiarizar com a noção de tempo de execução de um comando. Utilize a função `system.time()` para comparar o tempo exigido do sistema pelo seu `for` e pelo **funcional** que usamos acima. Por enquanto ainda executamos funções muito simples, mas aqui já temos um exemplo dos custos adicionais para determinar valores e ter mais passos de execução.
+  
+```{r}
+info.setor <- c()
+
+for (setor in seq_along(estat.list)){ 
+  
+  info.setor <- c(info.setor, sum(is.na(estat.list[[setor]]$Mean)) == 0)
+  
+  names(info.setor) <- c(names(info.setor)[-length(info.setor)], names(estat.list[setor]))
+  
+}
+```
+
+**2.** Utilize agora a função `apply()` para executar o nosso `for` acima que identificou quais colunas possuiam um único valor no objeto `pim`. 
+
+**3.** Vamos agora observar o `for` que fizemos para produzir o objeto `estat`. 
+  a. Nós poderíamos ter utilizado apenas a função `matrix` para produzir nossas observações - em particular o objeto `setor.UF`? Qual seria a desvantagem desse método?
+  b. Por que utilizamos a função `matrix()` para juntar as observações do estado e do setor com as estatísticas?
+  c. Qual a classe final de `setor.UF`? Comparando com o nível de complexidade dos tipos de vetores, o que isso nos diz sobre a relação entre `matrix` e `data.frame`?
+  
+**4.** Execute passo a passo o código da função `summary.default` para o trecho que usamos (após a **condicional** de `is.numeric`). 
+
+  a. Compare as funções que utilizamos para obter estísticas descritivas para `info.MG.Ext` com os resultados da função `quantile` no código.
+  
+  b. Em que momento foi definido o `quantile.type` utilizado na função?
+  
+  c. É necessário utilizar o tipo `integer`, na forma `1L:3L`, para selecionar os elementos do vetor?
+  
+  d. Você consegue pensar em como modificar o código para que a tabela resultante sempre mostre o número de `NA` no vetor, ao invés de mostrar apenas quando há pelo menos um elemento faltando?
+
+#### Referências
+
+
+
+[^1]: API, ou *interfaces de programação de aplicações*, são interfaces computacionais feitas para facilitar a troca de informações entre softwares sem que seja necessário entender todas as etapas do processo. 
+[^2]: Ainda assim, crie o hábito de solucionar suas dúvidas através da documentação do pacote no CRAN. Um jeito fácil é sempre buscar "`nome_do_pacote` CRAN" na internet e abrir o [arquivo pdf](https://cran.r-project.org/web/packages/sidrar/sidrar.pdf) com a descrição dele. O conteúdo é o mesmo de quando buscamos ajuda no próprio **RStudio**, mas as vezes ler na página inteira e ver o conjunto das funções todas juntas facilita a compreensão.
+
+```{r, include=FALSE}
+# FALTA INCLUIR
+# sloop::ftype(summary)
+
+```
