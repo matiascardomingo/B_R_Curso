@@ -1,0 +1,310 @@
+---
+title: "Aula 3"
+author: "Matias Rebello Cardomingo"
+output: html_document
+bibliography: "aula3.bib"
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: center
+}
+
+</style>
+
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Funções e análise de séries temporais
+
+Na última aula nós utilizamos do pacote `sidrar`, que permite acessar as informações disponibilizadas no portal [Sidra](https://sidra.ibge.gov.br/) do IBGE. Nessa aula vamos seguir analisando as séries disponibilizadas por esse mecanismo, realizando a análise de um número maior de informações por outros métodos, principalmente trabalhando com a criação de funções no *Global Environment*. Em seguida, vamos aprofundar em alguns dos instrumentos do **R** para séries de tempo. Boa parte do material para a segunda parte da aula foi retirado do livro @metcalfe2009, alguns dos dados utilizados nesse livro também estão disponíveis nesse repositório do [GitHub](https://github.com/prabeshdhakal/Introductory-Time-Series-with-R-Datasets).
+
+Para começar vamos novamente baixar a Pesquisa Industrial Mensal, mas vamos trabalhar com o máximo de informação que o pacote nos permite. Como há um limite máximo de 50 mil observações a cada download, vamos selecionar alguns estados para começar (não se esqueça que, caso você queira selecionar outras localidades, basta acessar a página resumo usando `sidrar::info_sidra(3653, wb = T)`).  Escolhidos os estados, basta selecionarmos a série que desejamos e o período, pois o `default`[^1] (ou *padrão*) da função já estará definido para baixarmos todas os setores. Repare na mensagem que a função irá imprimir a respeito do argumento `classific`, ou veja o código da função colocando apenas `sidrar::get_sidra` no console sem os parênteses e aperte `Enter`.
+
+```{r}
+pim <- sidrar::get_sidra(3653, # x = série a ser obtida
+                  variable = 3135, # Índice de base fixa sem ajuste sazonal (média de 2012 = 100)
+                  period = "200201-202011", # Início e fim da amostra "AAAAMM-AAAAMM"
+                  geo = "State", # Escolher UF
+                  geo.filter = list("State" = c(13, # AM
+                                                23, # CE
+                                                51, # MT
+                                                31, # MG
+                                                26, # PE
+                                                43, # RS
+                                                35)))  # SP 
+```
+
+Assim como na última aula, você pode olhar a base que baixamos utilizando a função `View()`. Nesse caso, ao menos no meu computador, essa página de vizualiação fica consideravelmente mais lenta, devido ao tamanho da base de dados que estamos usando. 
+
+Vamos repetir o procedimento de eliminar as colunas que não trazem variação em seus dados, já que elas apenas ocupam espaço na memória. Para isso vamos voltar a utilizar a **programação funcional**, mas dessa vez com a função `apply`. Essa função possui três argumentos principais, o primeiro é o objeto de dados que vamos utilizar (`X`), o segundo (`MARGIN`) informa sobre qual margem vamos aplicar a função selecionada, se sobre as linhas (`MARGIN = 1`), ou sobre as colunas (`MARGIN = 2`). Por fim, o terceiro argumento é a própria função que usaremos (`FUN`).
+
+Lembre-se que da última vez nós utilizamos o *operador booleno* `==` para criar o vetor `unico`, responsável por identificar quais colunas tinham um número de elementos únicos igual a `1`. Em seguida, nós fizemos a inversão desse valores utilizando `!`. Agora que já passamos por todos esses comandos, podemos ser mais diretos, então vamos pedir para que a função nos indique quais colunas (note, colunas, logo usaremos `MARGIN = 2`) possuem um número de valores únicos maior que `1`. 
+
+Como não existe nenhuma função no **R** que nos indique essa variedade de valores únicos no vetor, novamente teremos que desenvolver nossa própria função e fornecê-la de argumento em `FUN =`. A última vez que nós criamos uma função foi na primeira aula, em que geramos a função `salario`, responsável por criar uma **classe** `"salario"` para a qual desenvolvemos um método da função `print`. Mas vamos retomar essa noção de criar um função agora que já nos conhecemos um pouco melhor.
+
+## Definindo funções
+
+Criar uma função é tão simples quanto criar qualquer outro *objeto* no **R** e a forma de escrevê-las se assemelha bastante à escrita dos **ciclos** de `for`. Ou seja, caso seja preciso definirmos os comandos em mais de uma linha, basta colocarmos `{` no começo do código e `}` no final. Pois bem, vamos criar a função `variacao` que nos retornará um único valor lógico indicando se o vetor fornecido para ela possui um único valor, ou se ela apresenta variação nos dados. Logo, nós poderíamos construir uma função de apenas um argumento, o vetor de `dados` que devem ser analisados. Mas, vamos acrescentar à nossa função a possibilidade dela também retirar da análise todos os valores faltantes, afinal, podemos ser enganados pelo fato do **R** contabilizar `NA` como um valor. Assim, nossa função terá também o argumento `na.rm =`[^2] e vamos definir que ela excluirá valores faltantes a não ser que se estabelça o contrário (ou seja, o padrão será `na.rm = T`).
+
+```{r}
+variacao <- function(dados = c(), na.rm = T) {
+  
+  if(na.rm) {
+    
+    return(length(unique(dados[!is.na(dados)]))!= 1)
+    
+           } else return(length(unique(dados)) != 1)
+  
+}
+```
+
+Nossa função `variacao`, portanto, retorna `FALSE` todas as vezes que o vetor apresentar um único valor. Isso foi definido através da função `return()` para cada um dos casos. Antes de partirmos para que ela analise a tabela toda, vamos testá-la aplicando nas colunas `pim$Nível Territorial`[^3] e `pim$Valor`. 
+
+```{r}
+variacao(pim$`Nível Territorial`) ; variacao(pim$Valor)
+```
+
+Parece estar funcionando como gostaríamos, então podemos aplicar no **funcional** `apply`, definindo quais colunas apresentam variação (ou poderíamos até mesmo ter utilizado a própria função `apply` no *subsetting* de `pim`.
+
+```{r}
+col.variacao <- apply(X = pim, MARGIN = 2, FUN = variacao)
+```
+
+Você pode notar que conseguimos fazer não apenas a identificação dos vetores que apresentam alguma variação, como também criamos um vetor que preservou o *atributo* nomes das colunas. Faça o teste:
+
+```{r}
+all(colnames(pim) == names(col.variacao))
+```
+
+Agora, tal como fizemos na última aula, podemos retirar de `pim` todas as colunas que não acrescentam nada para nossa análise, ou seja, voltaremos às 7 colunas que já estamos nos familiarizando.
+
+```{r}
+pim <- pim[,col.variacao]
+```
+
+Agora vamos fazer a outra parte da análise inicial que fizemos na última aula e entendermos para quais setores industriais nós de fato temos informações, ou seja, não se trata de um vetor de valores faltantes. Para isso vamos construir uma matriz que nos traga cinco informações: setor industrial, unidade da federação, número de observações não faltantes, a data da primeira observação e a data da última observação. 
+
+Nós já sabemos como fazer para construir as duas primeiras informações, certo? Basta utilizarmos um **ciclo** de `for`como fizemos na última aula. Portanto, dessa vez podemos nos concentrar em como vamos obter as três últimas. Para o número de observações não faltantes nós já temos uma velha conhecida que pode nos ajudar, a função `is.na()`. Com ela e com a propriedade do **R** de interpretar valores lógicos como `1` e `0` podemos somar cada um dos casos em que o valor for `!= NA`.
+
+```{r}
+n.obs <- function(vetor) return(c(sum(!is.na(vetor))))
+```
+
+Já no caso das duas última colunas, vamos ter que conhecer um pouco melhor de que maneira estão descritas as datas de cada informação. Vamos começar observando as duas colunas referentes a datas.
+
+```{r}
+head(pim[,c("Mês (Código)", "Mês")])
+```
+
+Logo, sabemos que é preciso nos preocupar apenas em identificar o mês e o ano de cada observação. Acontece que o **R** não é capaz de identificar que essas informações são datas, pois elas foram informadas de uma maneira fora do padrão e ele é incapaz de encaixá-las na *classe* `Date`. Como queremos que o **R** consiga ler esse vetor para entender qual é seu menor valor e qual seu maior, vamos precisar transformá-lo nessa *classe*. Para isso vamos usar a função `as.Date()` que transforma vetores de `"character"` em objetos entendidos pelo **R** como datas e, em seguida, vamos fazer com que a função crie um vetor com os dois valores extremos do período.
+
+O jeito mais fácil para cumprirmos essas duas tarefas será usarmos da coluna `"Mês (Código)"`, dado que ela é composta apenas por números que podemos reordenar de uma forma conveniente. Nosso método será separar os dois últimos dígitos de `"Mês (Código)"` dos quatro primeiros usando a função `substr()` e vamos informar ao **R** que cada parte representa o mês e o ano, respectivamente, para depois acrescentarmos um dia (que vamos estabelecer como `15` apenas por convenção), completando a data.
+
+Por fim, devemos lembrar que nós desejamos apenas as datas referentes aos períodos para os quais temos informações. Ou seja, precisamos também informar um vetor de `referencia` que irá informar se os dados estão faltantes.
+
+```{r}
+datas <- function(periodo = character(), referencia = c()) {
+  
+  periodo <- as.Date(paste(substr(periodo, start = 1, stop = 4),
+                           substr(periodo, start = 5, stop = 6),
+                           "15",
+                           sep = "-"))
+                   
+                   
+  
+  periodo <- periodo[!is.na(referencia)]
+  
+  return(c(min(periodo), max(periodo)))
+  
+}
+```
+
+Novamente, vamos testar nossa função para todos os estados aplicando a função `datas` sobre os vetores `pim$Mês (Código)` e `pim$Valor`.
+
+```{r}
+teste <- datas(periodo = pim$`Mês (Código)`, referencia = pim$Valor)
+
+teste
+```
+
+Agora podemos aplicar as duas funções que criamos para gerar a tabela resumo daquilo sobre nossos dados.
+
+```{r, warning=FALSE}
+info.pim <- data.frame()
+
+for (uf in unique(pim$`Unidade da Federação`)) {
+  
+  for (setor in unique(pim$`Seções e atividades industriais (CNAE 2.0)`)) {
+    
+    pim.UF.Setor <- pim[pim$`Unidade da Federação` == uf &
+                          pim$`Seções e atividades industriais (CNAE 2.0)` == setor,]
+    
+    Obs <- n.obs(pim.UF.Setor$Valor)
+    
+    inicio.fim <- datas(periodo = pim.UF.Setor$`Mês (Código)`,
+                        referencia = pim.UF.Setor$Valor)
+    
+    info.pim <- rbind(info.pim,
+                      data.frame(UF = uf, Setor = setor, 
+                                 N.obs = Obs, 
+                                 Inicio = inicio.fim[1], 
+                                 Fim = inicio.fim[2]))
+    
+  }
+  
+}
+```
+
+Não se assuste com esses vários avisos em vermelho. O problema está exatamente na nossa definição da função `datas()` que pede para calcular valores máximos e mínimos de séries sem nenhum valor. Mas veja agora o que geramos usando novamente a função `View()`, dessa vez analisamos informações de número ainda maior de estados e setores utilizando outras ferramentas. Vamos agora limpar nossa tabela e manter apenas os aquelas linhas que nos indicam informações não faltantes.
+
+```{r}
+info.pim <- info.pim[info.pim$N.obs != 0, ]
+```
+
+Você pode utilizar qualquer uma das técnicas que já discutimos para descobrir quais setores reúnem informações para todos os estados. Vou dar uma sugestão utilizando dos nossos *operadores booleanos* para estabelecer outra condição: o setor deve conter informações para todos os estados durante o mesmo período, sendo que esse período deve ser máximo. Ou seja, o início de todas as séries deve coincidir com o valor mínimo das datas e o final das séries deve coincidir com o valor máximo.
+  
+```{r, warning=FALSE}
+presenca <- c()
+
+for (setor in unique(info.pim$Setor)) {
+  
+  condicao1 <- length(unique(info.pim$UF[info.pim$Setor == setor])) == length(unique(info.pim$UF))
+  
+  condicao2 <- all(min(info.pim$inicio[info.pim$Setor == setor]) == info.pim$inicio[info.pim$Setor == setor])
+  
+  condicao3 <- all(max(info.pim$fim[info.pim$Setor == setor]) == info.pim$fim[info.pim$Setor == setor])
+  
+  presenca <- c(presenca, condicao1 & condicao2 & condicao3)
+  
+  names(presenca) <- c(names(presenca)[-length(presenca)], setor)
+  
+}
+```
+
+Como você pode notar, usando esse critério nós restamos com apenas três setores, dentre os quais vou escolher a indústria geral. 
+
+```{r}
+pim <- pim[pim$`Seções e atividades industriais (CNAE 2.0)` == "1 Indústria geral",]
+```
+
+### Séries temporais
+
+O **R** possui a classe `"ts"` feita exatamente para trabalharmos com séries de tempo. A vantagem dessa classe é o fato de termos algumas funções já definidas capazes de nos fornecer uma série de informações. Para conhecê-la, vamos criar um objeto dessa classe contendo as informações sobre o estado do Amazonas. 
+
+```{r}
+AM.ts <- ts(pim$Valor[pim$`Unidade da Federação` == "Amazonas"], 
+         start = c(2002,01), 
+         end = c(2020,11),
+         frequency = 12)
+```
+
+Agora *printe* `AM` em seu console e veja a forma como os dados sairão. Já é bastante diferente de como estamos acostumados a ver vetores, ou seja, o que podemos esperar da resposta para `sloop::s3_dispatch(print(AM.ts))`? Da mesma forma, podemos vizualizar a série que estamos trabalhando através da função `plot()`, que no caso de objetos da classe `"ts"` possuem um uso bastante fácil..
+
+```{r}
+plot(AM.ts)
+```
+
+O gráfico para a índustria amazonense permite notarmos um comportamento parecido com os ciclos recentes da economia brasileira. Entre 2002 e 2013 há uma expansão relevante, seguida por uma crise que, nesse caso, se manifesta a partir de 2014. É interessante notarmos o impacto da pandemia no gráfico, bastante visível no início de 2020. 
+
+A análise desses dados, assim como de qualquer série temporal também pode ser feito através de uma decomposição de seus elementos. Em particular, é possível identificarmos três componentes principais: sua tendência ($T_t$), variações sazonais ($S_t$) e choque aleatórios ($\epsilon_t$) que não podem ser explicados por nenhum dos outros dois. A série, portanto, pode ser entendida em sua forma *aditiva* da seguinte forma: $$ X_t = T_t + S_t + \epsilon_t $$ 
+
+Existem alguns métodos para obtermos cada um desses componentes. No **R** a função `decompose()` nos permite fazer a decomposição da seguinte forma: primeiro a tendência ($T_t$) é calculada a partir de uma média móvel da série (você deve ter ouvido falar bastante sobre isso durante a pandemia), em seguida ela é subtraída da série; com o resultado disso obtemos o efeito sazonal ($S_t$) através da média para cada um dos períodos, no casos tratam-se de 12 períodos distintos, ou 12 meses e, então, ela também é subtraída; o restante é chamado por resíduo ($\epsilon_t$).
+
+```{r}
+AM.dec <- decompose(AM.ts)
+
+plot(AM.dec)
+```
+
+Uma outra forma de representarmos graficamente o comportamento sazonal das séries é construindo o chamado *boxplot* para cada um de seus períodos. Para isso a função `cycle()` constrói uma identificação de cada um dos períodos e o *boxplot* nos permite identificar o comportamento diferenciado entre eles. *Boxplots* servem para vizualizarmos a dispersão dos dados, dando uma dimensão de seu comportamento mais visual que estatísticas únicas como a média ou a mediana. A construção desses gráficos é feita com a linha mais grossa ilustrando a mediana, enquanto cada extremidade da caixa representam o primeiro ($Q_1$) e o terceiro quartis ($Q_3$). As linhas pontilhadas são determinadas pela distância inter-quartis ($DIQ$): $DIQ = Q_3 - Q_1$.
+
+```{r}
+boxplot(AM.ts ~ cycle(AM.ts), 
+        range = 1)
+```
+
+Para entendermos um pouco melhor, vamos ver os valores dos quartis para a distribuição em Março (3). Note a forma como faremos o *subsetting* para obter o objeto `marco`, vamos criar uma sequência a partir de `3` até o tamanho da dimensão de `AM.ts` andando de `12` em `12` números. 
+
+```{r}
+marco <- AM.ts[seq(from = 3, to = length(AM.ts), by = 12)]
+
+quantile(marco)
+```
+
+Assim, $DIQ =$ `r 102.75 - 82.55` e a linha tracejada deve chegar até o maior valor dentro dessa distância a partir do $Q_3$, assim como no menor valor dentro do intervalo a partir de $Q_1$. Nesse caso temos:
+
+```{r}
+acima <- marco > 102.75 & marco < 102.75 + 20.2
+
+max(marco[acima]) # Valor máximo da linha tracejada em março
+
+abaixo <- marco < 82.55 & marco > 82.55 - 20.2
+
+min(marco[abaixo]) # Valor mínimo da linha tracejada em março
+```
+
+Por fim, os valores que se encontram fora desse intervalo são representados como pontos no gráfico. Você pode buscar quais são eles. 
+
+### Exercícios
+
+**1.** Vamos trabalhar com outras possibilidades de construir nossa função `variacao`. 
+
+  a. Experimente criar um objeto dentro da função chamado `resultado` e peça para ela retornar apenas `resultado`. 
+  
+  b. Ao invés de termos definido uma função na qual podemos escolher entre retirar ou não os valores faltantes, também era possível pedirmos para que a função identificasse a existência deles e, em caso positivo, os retirasse do vetor. Crie uma função que faça isso.
+  
+  c. A função iria funcionar se não tivéssemos estabelecidos o argumento na forma `dados = c()` e usássemos apenas `dados`? Qual a diferença entre esses métodos?
+  
+  d. Agora experimente não utilizar `return()`, qual a mudança no comportamento da função? Como isso se relaciona com o primeiro `for` que fizemos na Aula 2?
+  
+**2.** Agora vamos trabalhar sobre as funções `n.obs()` e `datas()`.
+
+  a. Utilize da função `attr()` para fazer com `n.obs()` produza um vetor nomeado através do argumento `"which ="`. Identifique se o vetor foi nomeado através da função `str()`.
+
+  b. Caso tivéssemos usado `"/"` no argumento `sep =` para `datas()` a função teria funcionado?
+  
+  c. Era possível você ter estabelecido para o **R** datas no formato usual no Brasil com `"DD/MM/AAAA"`? Experimente alterar a função utilizando o argumento `format =` da função `as.Date()`.
+  
+  d. O que teria acontecido caso você utilizasse o argumento `collapse =` da função `paste()`?
+  
+**3.** Ao obtermos os setores presentes em todos os estados através da base de dados `info.pim` nós utilizamos de um novo `for`. Como era possível criarmos outro método utilizando apenas o número de observações?
+
+**4.** Nós discutimos como as funções genéricas possuem uma série de métodos para trabalhar com objetos da classe `"ts"`. Utilize o vetor `pim$Valor[pim$Unidade da Federação == "Amazonas"]` para produzir o mesmo gráfico que fizemos. 
+
+  a. Será necessário definir qual o vetor de dados para o eixo `x`.
+  
+  b. Também é preciso estabelecer o título dos gráficos utilizando `xlab` e `ylab`.
+  
+  c. Qual argumento define a mudança entre o gráfico de pontos e de linha?
+
+**5.** Para gerar um objeto da classe `"ts"` nós utilizamos apenas informações do estado do Amazonas. Mas e se quiséssemos gerar uma base de dados em que cada coluna fosse um objeto dessa classe?
+
+  a. Primeiro será preciso fazer com que cada estado se torne uma coluna de nossa base de dados.
+
+  b. Utilize a função `apply` para transformar cada uma das colunas em `"ts"`.
+  
+  c. Como podemos armazenar as demais informações geradas por `decompose()` de forma semelhante?
+
+### Referências
+
+[^1]: Você deve se lembrar do exercício **4**.b. da última aula, em que questionamos onde a informação `quantile.type` era armazenada na função `summary.default()`. Ela foi um primeiro exemplo de argumentos `default`, ou seja, argumentos definidos no próprio script da função. São aqueles que não precisamos definir, pois são estabelecidos no próprio código. 
+[^2]: Outras funções utilizam o mesmo argumento, como você deve se lembrar. A sigla represeta `NA remove`, ou seja, deve-se ou não remover `NA`. 
+[^3]: Repare que aqui o nome da variável está escrito sem acento grave (```), mas isso é apenas pela notação do **Rmarkdown** (ou seja, da forma como criamos páginas como essa que você está lendo agora diretamente do **R**). Quando você for escrevê-la deve acrescentar o acento grave no ínicio e ao final.
