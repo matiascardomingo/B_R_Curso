@@ -44,11 +44,14 @@ Isso a Globo não mostra.
 
 - **Plano de aulas**
   1. Introdução à programação - Parte 1
-  2. Introdução à programação - Parte 2
-  3. Uso de microdados (PNAD Covid?)
-  4. Introdução à econometria - Painel
-  5. Acessando dados de Brasil no R
-  6. Introdução à econometria - Séries de tempo
+  2. Introdução à programação e Sidra - Parte 2
+  3. Séries temporais no Sidra
+  4. Noções de Estatística e Séries temporais
+  5. 16/2 - Raiz Unitária e Séries temporais
+  Pausa. 23/2 - Revisão Aulas 1 a 5
+  6. 2/3 - Boletins a partir de PNAD
+  7. 9/3 - Econometria (Cross section)
+  8. 16/3 - Econometria (Cross section e Painel)
   
 ## Programação e linguagem
 
