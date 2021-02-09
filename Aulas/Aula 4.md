@@ -1,4 +1,4 @@
-## Aula 4 - Noções de estatística em séries temporais e gráficos
+## Aula 4 - Noções de estatística em séries temporais 
 
 Nessa aula nós vamos utilizar os métodos da econometria de séries temporais para investigar uma questão fundante: *quem veio primeiro, o ovo ou a galinha?*
 
