@@ -1,0 +1,278 @@
+---
+title: "Aula 4"
+author: "Matias Rebello Cardomingo"
+output: html_document
+bibliography: "aula4.bib"
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: center
+}
+
+</style>
+
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Séries temporais
+
+Ná ultima aula começamos a utilizar as ferramentas disponibilizadas pelo **R** para análise de séries temporais. Vamos nos aprofundar nesse esforço e entender o que é possível fazermos para complementar nossas análises da economia brasileira. Apenas de íncio, vamos usar o **R** para repoduzir uma certa "brincadeira" em séries temporais a partir dos dados para Brasil: descobrir o que veio primeiro, afinal, o ovo ou a galinha?
+
+## Causalidade de Granger
+
+Essa questão já foi tratada inúmeras vezes a partir do arcabouço das séries temporais, em [artigos](https://www.researchgate.net/publication/314241967_Understanding_Causality_What_came_first_the_Chicken_or_the_Egg) recentes como de @Perez2015, mas também em [posts](https://www.rpubs.com/chazclark/543074) da comunidade **R**. Contudo, a ideia seminal é do [artigo](http://www.walkerd.people.cofc.edu/400/Sobel/P-12.%20Thurman%20-%20Chickens%20Eggs%20and%20Causality.pdf) de @Thurman1988, dois professores da Universidade Estadual da Carolina do Norte, e se popularizou tanto que hoje a base de dados que usaram pode ser acessada pelo comando `lmtest::ChickEgg`. O autores utilizam do conceito de *causalidade de Granger* para responder o que chamam de "*pergunta respeitável*". 
+Na época em que o artigo foi escrito o significado da *causalidade de Granger* ainda estava em construção. Mas eles já indicam simpatizar com a sugestão do próprio *Sir* Clive Granger[^1] de entender essa relação não como uma *causalidade* diretamente, mas sim uma *precedência temporal*. Ou seja, dizer que galinhas *Granger causam* ovos, ou vice-versa, quer apenas dizer que galinhas precedem os ovos temporalmente. Segundo os autores:
+
+<div class = "center">
+"*Se valores defasados de $X$ ajudam a prever valores correntes de $Y$ em uma previsão formada por valores defasados de $X$ e $Y$, então dizemos que $X$ *Granger causa* $Y$*." (grifo nosso - p. 237)
+</div>
+
+Ou seja, para executar o teste os autores buscam a significância estatística das defasagens de galinhas e de ovos na explicação do nível atual de galinhas e de ovos. Nesse caso os autores usam quatro defasagens de cada série na explicação dos valores correntes delas. Ou seja, nós fazemos uma regressão na forma: $$ Galinhas_t = \mu + \sum_{i = 1}^{L} \ \alpha_i \ Galinhas_{t - i} + \sum_{i = 1}^{L} \ \beta_i \ Ovos_{t - i} + \epsilon_t $$ 
+
+sendo que, por hipótese, temos $\epsilon_t \sim N(0,\sigma^2)$. Logo, nosso teste terá como hipótese nula ($H_0$) que ovos **não Granger causam** galinhas, ou seja, $H_0: \beta_1 = ... = \beta_L = 0$. Da mesma forma, na regressão reversa temos como hipótese que galinhas **não Granger causam** ovos. 
+
+Vamos reproduzir os testes feitos por @Thurman1988 com dados brasileiros a partir da pesquisa POG (Pesquisa de Ovos de Galinha) do IBGE, novamente retirada do [Sidra](https://sidra.ibge.gov.br/), para a qual temos informações trimestrais desde 1987 até o 2020. Trata-se da tabela `915`, para a qual podemos novamente verficar as informações através do comando `sidrar::info_sidra(915, wb = T)`. Vamos desenvolver esse teste em etapas, inicialmente escrevendo toda a regressão que queremos testar e, na sequência, reproduzindo através de outros comando que facilitam nosso código. Vamos então baixar as informações que queremos e vizualizá-las.
+
+```{r}
+pog <- sidrar::get_sidra(915,
+                         period = "198701-202003",
+                         variable = c(1988, 29), 
+                         classific = "C12716",
+                         category = list("C12716" = 115236))
+
+View(pog)
+```
+
+Note que dessa vez nós temos uma variação muito importante em nossa base dados: as séries com que desejamos trabalhar estão empilhadas em uma mesma coluna. Isso pode ser notado pelo fato da nossa variável de datas apresentar valores repetidos, afinal um se refere às galinhas e outro aos ovos. Como nesse caso nós também queremos com que nossas séries sejam da classe  `ts` para facilitar o manuseio, então vamos construir uma nova base de dados que corrija essa confusão. De todo modo, é sempre importante estarmos atentos à maneira como a base é construída, exatamente para sabermos quando é necessário alterá-la, como nesse caso.
+
+<div class = "bloco">
+
+<div class = "center">
+Bases *tidy*
+</div>
+
+A noção de *tidy* é apresentada em @wickham2017 e trata de três princípios:
+
+  1. Cada variável deve ter sua própria coluna.
+  
+  2. Cada observação deve ter sua própria linha.
+  
+  3. Cada valor deve ter sua própria célula.
+  
+Em muitos casos não é exatamente necessário pensar dessa forma. No caso da aula de hoje, por exemplo, saberíamos que não seria possível executar uma regressão em que linhas distintas representam um mesmo período de tempo. De toda forma, como os conceitos desenvolvidos por Hadley e Grolemund são bastante conhecidos, é interessante destacarmos. O conjunto de pacotes **tidyverse** (*universo tidy*) apresenta uma série de ferramentas que permite trabalhar com facilidade no **R** aplicando essas noções para sermos capazes de **wrangle** (*brigar*) com as bases de dados até que elas se tornem facilmente analisadas. Em nossas últimas aulas olharemos com mais atenção para esses pacotes.
+
+</div>
+
+Agora vamos criar uma base de dados `BasePog` aplicando a função `ts()` sobre as duas séries unidas pelo comando `cbind()`. Note que como a série é trimestral, nós indicamos que sua frequência é `= 4`, ao invés dos `12` meses para nossas séries trimestrais da PIM. Veja também que, ao indicarmos o início e a frequência, não é necessário indicarmos a data final da série, que será estabelecida pelo número de observações.
+
+```{r}
+
+BasePog <- ts(cbind(pog$Valor[pog$`Variável (Código)` == 29],
+                       pog$Valor[pog$`Variável (Código)` == 1988]),
+              start = c(1987, 01),
+              frequency = 4,
+              names = c("Ovos", "Galinhas"))
+
+```
+
+Feita essa transformação, podemos novamente analisar o comportamento gráfico de nossa série utilizando a função `plot()` da aula passada, mas dessa vez com as duas em um único gráfico. Repare que agora vamos utilizar alguns outros argumentos para construir nosso gráfico, estabelecendo um novo título, além do rótulo no eixo X.
+
+```{r}
+plot(BasePog,
+     main = "Quem veio primeiro?",
+     xlab = "Datas")
+```
+
+Como podemos notar, uma simples observação a olho nu em nossos gráficos não permite distinguir se há uma precedência para nenhum dos lados. Então vamos aplicar o método descrito em @Thurman1988 para identificar se vale no Brasil a relação encontrada pelos autores de que *o ovo veio primeiro que a galinha*. Faremos nossa regressão de duas formas, uma bastante crua, para entendermos aquilo que está sendo feito em cada etapa e outra a partir do pacote `dynlm`, usado exatamente para regressões dinâmicas.
+
+No artigo original dos autores eles nos apresentam a análise de quatro regressões diferentes, cada uma contendo um número distinto de defasagens indo de 1 até 4. Aqui faremos apenas uma regressão com duas defasagens (nos exercícios terão outras regressões para serem feitas a partir da base dados original). O comando inicial que usaremos no **R** será o `lm()`, de *linear model* que executa a regressão por mínimos quadrados ordinários. 
+
+Para construir nossas defasagens vamos utilizar do *subsetting* de vetores, assim veremos exatamente de onde o **R** retira cada uma das informações. Para isso, vamos designar cada um dos vetores defasados como uma variável dentro de nossa *fórmula*[^2], sempre como `y ~ modelo`, sendo `y` nossa variável dependente e `modelo` a combinação de variáveis explicativas que serão utilizadas e suas respectivas interações.
+
+Assim, vamos escrever nosso modelo para `Galinhas` indicando que esse vetor deve começar a partir do terceiro elemento, para que assim a gente tenha duas defasagens anteriores. Da mesma forma, vamos indicar nas variáveis explicativas que a última observação de ser condizente com a defasagem em relação a última observação da dependente. Para facilitar nosso código, vamos estabelecer `n` como o número total das observações.
+
+```{r}
+n <-  nrow(BasePog)
+
+reg.galinhas.1  <- lm(Galinhas[3:n] ~ Galinhas[1:(n-2)] + Galinhas[2:(n-1)] + 
+                        Ovos[1:(n-2)] + Ovos[2:(n-1)],
+                      data = BasePog)
+
+reg.galinhas.2  <- lm(Galinhas[3:n] ~ Galinhas[1:(n-2)] + Galinhas[2:(n-1)],
+                      data = BasePog)
+```
+
+Repare que cada uma das regressões apareceu como uma lista em nossos objetos do *Global Environment*. Nós vamos explorar depois um pouco desses elementos, mas apenas para matar a curiosidade, peça para o console imprimir `reg.galinhas.1`. Como você pode notar, não são retornadas muitas informações, apenas o valor do coeficiente. É por isso que nesse caso se torna muito imporatante o método `summary.lm` da função `summary`. Através desse método nós podemos ter uma vizualização muito mais nítida de nossos resultados.
+
+```{r}
+summary(reg.galinhas.1)
+```
+
+Note que fizemos duas regressões, uma delas incluindo as defasagens de `Ovos` e outra não. Isso porque o teste de Granger que faremos será considerando a significância estatística conjunta dos dois termos defasados de ovos. Ou seja, veremos se ao incluir $Ovos_{t-1}$ e $Ovos_{t-2}$ o modelo como um todo torna-se melhor em relação ao modelo sem a inclusão dessas variáveis. Para conseguirmos identificar essa influência das variáveis de ovos vamos verificar o comportamento da soma do quadrados dos resíduos de cada regressão ($\sum_{t = 1987T1}^{2020T3} \ \epsilon_t^2$). Caso os ovos sejam relevantes, então a diferença entre os resíduos terá se reduzido de forma significativa e poderemos rejeitar a hipótese de que os coeficientes associados a ele são defasados. Caso contrário, isso não será possível. A comparação entre modelos *aninhados* (ou seja, que um possui exatamente as mesmas variáveis que o outro e ainda outras além) pode ser feita por meio da seguinte estatística: $$ F = \frac{\frac{SQR_1 \ - \ SQR_2}{p_2 - p_1}}{\frac{SQR_2}{n - p_2}} $$ 
+
+Em que $SQR$ é a soma do quadrado dos resíduos, $1$ representa o modelo sem restrições (`reg.galinhas.1`) e $2$ o modelo com restrições (`reg.galinhas.2`), $p$ é o número de parâmetros de cada modelo ($p_1 = 5$ e $p_2 = 3$) e, por fim, $n$ igual ao número de observações. Assim, dizemos que essa estatística segue a [distribuição](https://pt.wikipedia.org/wiki/Distribui%C3%A7%C3%A3o_F_de_Fisher-Snedecor) $F$ com graus de liberdade $p_1 - p_2$ e $n - p_2$. Essa distribuição, por sua vez, é composta pela divisão de duas variáveis aleatórias que seguem a distribuição $\chi^2$ (escreve-se *chi quadrado* e se pronuncia *qui qudrado*), que por sua vez é obtida quando elevamos ao quadrado uma série que segue distribuição normal. Assim, podemos primeiro identificar se os resíduos da regressão de fato apresentam distribuição normal para validar nossa hipótese sobre o comportamento do erro no modelo.
+
+<div class = "bloco">
+<div class = "center">
+**Erro** e **resíduo**
+</div>
+
+Apesar de ser algo simples, é sempre importante lembrar da diferenciação entre **erro** do modelo e o **resíduo** da regressão. No nosso caso nós modelamos a quantidade corrente de *galinhas* criando um modelo em que ela é explicada por quantidades anteriores de galinhas e de ovos mais um elemento aleatório $\epsilon_t$. Nesse caso nós suposemos que esse termo aleatório segue uma distribuição normal de média zero e variância $\sigma^2$ ($N(0,\sigma^2)$), ou seja, trata-se de um elemento que não podemos observar mas supomos seu comportamento. 
+
+Já o **resíduo** consiste naquilo que efetivamente podemos observar após feitas as regressões, tal como tínhamos o elemento `random` produzido pela função `decompose()`. É nesse sentido que precisamos verificar o quão próximo nosso resíduo está de nossa hipótese sobre a distribuição do erro.
+</div>
+
+Há duas [maneiras gráficas](https://en.wikipedia.org/wiki/Normality_test) de fazermos essa identificação: construirmos um histograma[^3] dos dados e compará-los à distribuição normal, ou fazermos um diagrama de dispersão dos dados com uma amostra criada a partir da distruição Normal. Faremos primeiro o gráfico do histograma e na sequência o chamado gráfico quantil-quantil. Como temos duas séries de resíduos para analisar, vamos estabelecer através do comando `par()`, responsável por definir os parâmetros dos gráficos, que cada um dos gráficos aparecerá lado a lado na imagem final. Para isso basta definir o argumento `mfrow = c(1,2)` em que dizemos que será uma única linha e duas colunas.
+
+```{r}
+par(mfrow = c(1,2))
+
+residuos.1 <- reg.galinhas.1$residuals
+residuos.2 <- reg.galinhas.2$residuals
+
+hist(residuos.1,
+     main = paste("Resíduo - Modelo 1"),
+     xlab = "Valor",
+     ylab = "Densidade",
+     freq = F)
+
+lines(x = seq(min(residuos.1), max(residuos.1), length.out = 101),
+      y = dnorm(seq(min(residuos.1), max(residuos.1), length.out = 101), sd = sd(residuos.1)),
+      col = "red")
+
+hist(residuos.2,
+     main = paste("Resíduo - Modelo 2"),
+     xlab = "Valor",
+     ylab = "Densidade",
+     freq = F)
+
+lines(x = seq(min(residuos.2), max(residuos.2), length.out = 101),
+      y = dnorm(seq(min(residuos.2), max(residuos.2), length.out = 101), sd = sd(residuos.2)),
+      col = "blue")
+```
+
+É possível notar que os resíduos se encaixam bastante bem na curva de densidade estabelecida pela distribuição Normal. Ainda assim, vamos também aplicar o outro método gráfico, construindo um [diagrama de dispersão dos quantis](https://pt.wikipedia.org/wiki/Gr%C3%A1fico_Q-Q) de nossos dados. Para isso será preciso primeiro padronizá-los (ou seja, subtrair a média de todas as observações e dividí-las pelo desvio padrão), na sequência vamos criar um vetor de dados gerados a partir da distribuição Normal através da função `rnorm()`[^4] e comparar a distruibuição dos dois do menor valor até o maior.
+
+```{r}
+par(mfrow = c(1,2))
+
+dados.norm <- rnorm(length(residuos.1))
+res.1.pad <- (residuos.1[order(residuos.1)] - mean(residuos.1)) / sd(residuos.1)
+res.2.pad <- (residuos.2[order(residuos.2)] - mean(residuos.2)) / sd(residuos.2)
+
+plot(x = dados.norm[order(dados.norm)],
+     y = res.1.pad[order(res.1.pad)],
+     xlab = "Amostra da dist. Normal",
+     ylab = "Resíduos 1 padronizados")
+
+lines(x = -3:3,
+      y = -3:3,
+      lty = 1234,
+      col = "red")
+
+plot(x = dados.norm[order(dados.norm)],
+     y = res.2.pad[order(res.2.pad)],
+     xlab = "Amostra da dist. Normal",
+     ylab = "Resíduos 2 padronizados")
+
+lines(x = -3:3,
+      y = -3:3,
+      lty = 1234,
+      col = "blue")
+```
+
+Nesse caso a análise do gráfico passa por observarmos o quão próximo as observações estão próximas das retas de 45º desenhadas em cada gráfico. Novamente podemos identificar que os resíduos do segundo modelo se distanciam mais da linha padrão em relação ao primeiro modelo, ainda assim, ambos resíduos parecem seguir uma distruibuição Normal. Por via das dúvidas, sempre podemos buscar testes estatísticos que possam confirmar nossas impressões, nesse caso temos o teste [*Shapiro-Wilk*](https://en.wikipedia.org/wiki/Shapiro%E2%80%93Wilk_test) disponível no **R** básico e o teste de [*Jarque-Bera*](https://en.wikipedia.org/wiki/Jarque%E2%80%93Bera_test) no pacote `tseries`. 
+
+Nesses dois testes nós temos como hipótese nula que a série segue uma distribuição normal, ou seja, caso a estatística do teste esteja fora da região crítica e seu "valor p" for superior ao nível desejado de significância ($\alpha$), então nós *não podemos rejeitar que nossas séries seguem uma distribuição normal*[^5].
+
+```{r}
+# Testes de normalidade para o Modelo 1
+shapiro.test(residuos.1) ; tseries::jarque.bera.test(residuos.1)
+
+# Testes de normalidade para o Modelo 2
+shapiro.test(residuos.2) ; tseries::jarque.bera.test(residuos.2)
+```
+
+Tudo isso afinal, serviu para podermos afirmar que os resíduos de nossas regressões se comportam de forma similar àquela que havíamos pressuposto. Tendo isso em vista, podemos afirmar que a soma dos resíduos ao quadrado segue uma distruibuição $\chi^2$ e, portanto, é possível utilizarmos a estatística $F$ para verificar a significância conjunta dos coeficientes - dado que a distribuição $F$ é decorrente da divisão entre duas $\chi^2$.
+
+Conforme mostramos acima, a estatística $F$ representa uma proporção da distância dos resíduos entre cada um dos modelos em relação aos resíduos do modelo censurado - ou com menor número de parâmetros. Vamos, portanto, construir nossa estatística de teste tal como mostramos e comparar seu valor com a tabela de significância do [teste F](https://pt.slideshare.net/ThiagoCarnevali/tabelas-f).
+
+```{r}
+# Estatística F
+
+# Numerador
+F.num <- (sum(residuos.2^2) - sum(residuos.1^2))/(length(coef(reg.galinhas.1)) - length(coef(reg.galinhas.2)))
+
+# Denominador
+F.den <- sum(residuos.2^2) / ((n - 2) - length(coef(reg.galinhas.2)))
+
+F.num / F.den # Valor da estatística
+
+```
+
+Neste caso nós temos uma estatística $F$ com `r length(coef(reg.galinhas.1)) - length(coef(reg.galinhas.2))` graus de liberdade no numerador (V1 na tabela) e `r (n - 2) - length(coef(reg.galinhas.2))` graus de liberdade no denominador (V2). Selecione a tabela referente ao nível de 1% de significância e busque o valor referente aos nossos graus de liberdade, você verá que a região crítica se inicia no valor 4.78, bastante inferior ao que obtivemos. Assim, nós não podemos rejeitar a hipótese nula de que as defasagens de ovos são relevantes para entendermos a quantidade presente de galinhas e isso se confirma quando utilizamos a função `grangertest()` do pacote `lmtest` para verificar essa relação.
+
+```{r}
+lmtest::grangertest(BasePog, order = 2)
+```
+
+Aqui o valor da estatística acabou sendo ainda maior do que aquele que obtivemos, pois o **R** ainda utiliza de a função `lmtest::waldtest()` para executar o teste, tal como podemos ver no corpo da função `lmtest::grangertest.default` quando digitamos no console. 
+
+Acontece que para podermos dizer se uma série *Granger causa* a outra é preciso não apenas que os coeficientes associados às suas defasgens sejam estatisticamente significantes, mas também que essa relação seja unidirecional. Ou seja, para validarmos que os ovos vieram primeiro também no Brasil seria preciso que as galinhas não apresentassem relevância estatística na previsão dos ovos. Vejamos:
+
+```{r}
+lmtest::grangertest(BasePog[,2:1], order = 2)
+```
+
+Repare em duas coisas, a primeira no fato de termos usado o *subsetting* apenas para inverter cada uma das colunas, permitindo que o comando passasse a interpretar a causalidade da primeira coluna para a segunda e não o contrário. Já a segunda coisa é que, no Brasil, infelizmente a estatística não é capaz de nos dizer se os ovos ou as galinhas vieram primeiro. Aqui nós somos capazes de rejeitar a hipótese nula de que os valores defasados de ambas as séries não são relevantes para explicar seus valores correntes.
+
+### Exercícios
+
+**1.** Vamos utilizar as bases de dados de @Thurman1988 e reproduzir alguns de seus resultados.
+
+  a. Repare que eles realizam o teste com 1 até 4 defasagens. De que maneira você poderia obter as oito regressões (com 4 defasagens para cada série) em um único **ciclo** de `for` usando a função `dynlm::dynlm()` e sua possibilidade de escrever defasagens na forma `L(variavel, def.inicio:def.final)`?
+  
+  b. Reproduza os testes utilizando o comando `lmtest::grangertest()`, a conclusão é a mesma que para o caso brasleiro?
+
+**2.** Você reparou que os comandos para criar cada um dos gráficos responsáveis por analisar a normalidade dos resíduos são muito parecidos. Vamos usar da linguagem para reduzir comandados repetidos.
+
+  a. Crie os gráficos dos resíduos a partir de um único `for` capaz de alterar (i) a série a ser utilizada, (ii) o título, (iii) os parâmetros da distribuição normal a ser desenhada sobre o histograma. 
+  
+  b. Use a função `png()` para salvar o gráfico. Escolha o nome do gráfico no argumento `filename =` e não se esqueça de usar a extensão inidicando o tipo de arquivo. (Ex: `"novografico.png"`)
+
+**3.** Seja $X$ uma variável aleatória discreta capaz de assumir 3 valores distintos ($x_1, x_2, x_3$), com probabilidades $p_i$ para $i \in \{1,2,3\}$ sendo $p_i > 0 \ \forall \ i$ e $\sum_i p_i = 1$.
+
+  a. Se $A$ é um número determinístico (sem variação), mostre que $E(X - A) = E(X) - A$ e $E(X*A) = E(X)*A$.
+  
+  b. Se $B$ é um número determinístico, mostre que $Var(X/B) \ = \ Var(X)/B^2$.
+
+### Referências
+
+[^1]: Ganhador do Nobel em Econmia de 2003 junto com seu colega Robert Engle.
+[^2]: Há uma série de comandos que podem ser utilizados dentro das *formulas*, é possível ver algumas dessas opções na seção *Details* da página de ajuda de `formula()`.
+[^3]: Lembre-se que histogramas são aqueles gráficos que nos indicam a *frequência* de valores dentro de um intervalo de valores.
+[^4]: Sempre que estamos criando uma série aleatória, seja na função `sample()`, seja obtendo números a partir de uma distribuição como em `rnorm()`, é possível fixar o resultado usando a função `set.seed()`. Assim, basta invocar a função com o mesmo número todas as vezes quando for obter a série aleatória.
+[^5]: A construção de conclusões na negativa é característica da estatística e reflete o fato de construirmos as conclusões a partir daquilo que foi pressuposto como hipótese nula.
+
+```{r, include=FALSE}
+# Tradução das opções em formula
+```
+
