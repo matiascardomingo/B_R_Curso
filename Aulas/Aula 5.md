@@ -6,4 +6,4 @@ Usaremos pela primeira vez o *Sistema Gerenciador de Séries Temporais* do **Ban
 
 De lambuja para construção de nossos dados ainda veremos como corrigir uma série com quatias em valor corrente para transformar em valores reais.
 
-O material da aula está nesse [link](https://matiascardomingo.github.io/B_R_Curso/Aula-5.html) e o código [aqui](https://github.com/matiascardomingo/B_R_Curso/blob/main/Scripts/Aula%205.Rmd). 
+O material da aula pode ser acessado [aqui](https://matiascardomingo.github.io/B_R_Curso/Aula-5.html) e o código nesse [link](https://github.com/matiascardomingo/B_R_Curso/blob/main/Scripts/Aula%205.Rmd). 
