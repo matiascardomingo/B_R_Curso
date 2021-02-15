@@ -1,0 +1,342 @@
+---
+title: "Aula 5"
+author: "Matias Rebello Cardomingo"
+output: html_document
+bibliography: aula5.bib
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: center
+}
+
+</style>
+
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Construindo sua base de dados - Desempenho econômico e variáveis fiscais
+
+Desde 2015 vivemos um período prolongado de recessão e baixo crescimento. Os motivos para a interrupção do período de expansão econômica do início do século XXI rendem discussões acalouradas. Nesta aula e na próxima vamos acompanhar a argumentação delineada em @chernavsky2020 sobre o papel da política fiscal para a crise. Enquanto na aula 5 vamos focar exclusivamente na construção da base de dados e como salvá-la, na próxima nós retomamos a análise de séries temporais reproduzindo os testes feitos pelos autores. 
+
+Tal como expresso no título "*Descontrole ou inflexão? A política fiscal do governo Dilma e a crise econômica*", os autores enxergam duas teses predominantes na compreensão da crise que se inicia a partir de 2015. Por um lado há uma leitura de que o gasto público tomou uma trajetória *descontrolada*, impactando a confiança dos agentes econômicos e provocando retração dos investimentos, tendo como resultado a retração da atividade. De outro lado estaria a compreensão que o ajuste fiscal iniciado em 2015, no primeiro ano do segundo governo Dilma, teria retraído a demanda agregada de forma excessiva provocando uma *inflexão* responsável pela queda no produto.
+
+Dada a centralidade das finanças públicas no debate a respeito da crise, os autores se propõem a analisar em maior profundidade a relação entre atividade econômica e variáveis fiscais. Para isso buscam demonstrar que uma verdeira explicação para a crise não está nem tanto ao céu, nem tanto ao mar. Com relação à tese do *descontrole*, apresentam dados de receitas e despesas que não indicam uma aceleração significativa desde os governos de Fernando Henrique Cardoso. Esses dados estão disponíveis no portal [Tesouro Transparente](https://www.tesourotransparente.gov.br/visualizacao/series-temporais-do-tesouro-nacional), mas infelizmente é preciso baixar cada uma das séries individualmente[^1]. Para construir o **Gráfico 1** do texto usaremos as séries de Receita Líquida e Despesa Total, disponíveis sob o *Tema 10 - Resultado Fiscal do Governo Central*, baixe ambas tabelas para seu computador.
+
+Para conseguir abrí-las no **R** podemos fazer de duas formas, ou podemos informar para ele o caminho do arquivo em nossa pasta de *Downloads* do computador, ou podemos transferir o arquivo para a pasta que estamos utilizando como **diretório de trabalho**[^2] (*working directory*). No primeiro caso você pode clicar com botão direito no arquivo e abrir a opção *Propriedades*, na sequência você deve escolher a aba *Segurança* e copiar a localização do arquivo indicada em *Nome do objeto*, tal como na figura abaixo.
+
+<div class = "center">
+![Seguranca](C:/Users/matia/OneDrive/Documentos/Economia/Aulas/5 - ST - Coin e FIR/Segunca.png).
+</div>
+
+Após colar o nome você ainda precisará fazer uma última alteração antes de colocar a localização como argumento da função `read.csv()`. O **R** não consegue ler arquivos quando eles estão escritos com  `\` (barra para a esquerda), por isso é preciso substituí-las por `/`, para isso basta usar o bom e velho `Ctrl + F`, pedindo para substituir a primeira pela segunda. Esse método de buscar o arquivo na pasta dos *Downloads* é o mais difícil, mas ele te mostra de que maneira o **R** pode funcionar, vasculhando através das suas pastas se orientado corretamente. A segunda maneira de abrir o arquivo é bastante mais prática, pois não exige pedirmos para que ele vá atrás do arquivo em outra pasta, basta ele abrir o arquivo correto na pasta que já está funcionando.
+
+Contudo, como você pode ainda não ter se atentado sobre qual pasta seu computador está usando para salvar seus *scripts* e resultados, vamos olhar para isso com mais calma. Em primeiro lugar, sempre é possível saber qual seu *diretório de trabalho* e o conteúdo dessa pasta com as seguintes funções:
+
+```{r, eval=FALSE}
+getwd() ; list.files()
+```
+
+Sendo assim, você pode simplesmente transferir o arquivo da sua pasta de *Downloads* para a seu *diretório*, de onde o **R** será capaz de ler os arquivos. Outra maneira é você definir para o **R** qual *diretório* ele deve usar através da função `setwd()`, em que você deve colocar como argumento a pasta com a qual ele deve trabalhar (sempre usando `/`).
+
+Muito bem, feito tudo isso, é hora de abrirmos os dados de receitas e despesas do Governo Federal. É importante observar que os autores do artigo fazem correções em ambas as séries[^2] para retirar eventos pontuais como a [cessão onerosa](https://petrobras.com.br/fatos-e-dados/tudo-o-que-voce-precisa-saber-sobre-cessao-onerosa.htm#:~:text=Cess%C3%A3o%20Onerosa%20%C3%A9%20um%20regime,com%20a%20Uni%C3%A3o%20em%202010.&text=Como%20pagamos%20%C3%A0%20Uni%C3%A3o%20o,valor%20do%20contrato%20fosse%20adequado.) dos barris de Petróleo com a Petrobrás. Nós não faremos essas correções, pois seria necessário buscarmos cada um dos valores, vamos trabalhar apenas com as séries originais. 
+
+### Política fiscal desde 1997
+
+Abra os arquivos adaptando o código abaixo com o nome que você atribuiu a cada um deles. O comando `read.csv()` será um dos que você mais vai utilizar como analista em economia, por isso vamos apresentar os argumentos que usamos abaixo. O primeiro deles refere-se ao fato das variáveis terem nome no arquivo de origem, quando definimos `header = T` a função toma a primeira linha do arquivo para nomear cada uma das variáveis (é necessário definirmos isso considerando o argumento *padrão*?). Já o segundo argumento refere-se a qual classe deve ser definida às *strings* do arquivo, se elas são uma variável `"character"` ou se devem ser entendidas como `"factor"`. Já o terceiro argumento serve para que o **R** entenda o padrão de divisão das variáveis, se serão vírgulas, como os arquivos *.csv* (*comma separated values* ou valores separados por vírgulas) costumam ser definidos, ou por outro separador, nesse caso a separação é feita por `";"`. Por fim, o último argument diz que o arquivo deve começar a ser lido a partir da 5ª linha, algo impossível de saber até que você efetivamente tenha olhado para a base de dados, mas nesse caso já adiantamos o serviço para você.
+
+```{r}
+receita <- read.csv("receita.csv",
+                    header = T,
+                    stringsAsFactors = F,
+                    sep = ";",
+                    skip = 5)
+
+despesa <- read.csv("despesa.csv",
+                    header = T,
+                    stringsAsFactors = F,
+                    sep = ";",
+                    skip = 5)
+```
+
+Repare que ambas as bases começam e terminam no mesmo período. Podemos até mesmo perguntar ao **R** se elas são exatamente iguais:
+
+```{r}
+receita$Data[c(1, nrow(receita))] ; despesa$Data[c(1, nrow(despesa))]
+
+all(receita$Data == despesa$Data)
+```
+
+Logo, é possível unirmos ambas para termos todas as informações em um único objeto usando o comando `cbind()`. Como cada uma delas tem informações sobre datas, nós podemos unir apenas a coluna de valores de uma base na outra. Na sequência vamos já redefinir os nomes de cada uma das variáveis.
+
+```{r}
+fiscal <- cbind(despesa, receita[[2]])
+
+colnames(fiscal) <- c("Data", "Despesa", "Receita")
+```
+
+Muito bem, agora note que, na verdade, o **R** interpreptou todas as variáveis como `"character"`, pois ele não reconhece datas como as escrevemos em português (como vimos na última aula) e tampouco consegue fazer a leitura de números cuja indicação dos milhares é feita por `"."` e a parte decimal indicada por `","`. Por isso, será preciso reformarmos ambas as variáveis, primeiro para ensinar a leitura das datas e, na sequência, para transformar os números a fim de fazê-los compreensíveis ao **R**. A primeira parte você já está especialista em fazer, então vou explicar apenas a segunda. Nós vamos pedir para que o **R** primeiro retire todos os pontos (*pattern*) dos números e não coloque nada em seu lugar (*replacement*), em seguida vamos substituir as vírgulas (*pattern*) por pontos (*replacement*) indicando as casas decimais; na sequência diremos para ele ler a nova informação como um número usando a função `as.numeric()`.
+
+Como nós desejamos fazer exatamente as mesmas alterações nas variáveis `"Despesa"` e `"Receita"`, vamos utilizar novamente da função `apply()`, aquela que aplica uma função sobre uma margem escolhida do obejto (linhas: `MARGIN = 1` ou colunas: `MARGIN = 2`). Repare que no argumento `FUN` nós indicamos que será usada a função `gsub`[^4] e na sequência podemos já indicar os argumentos da própria função `gsub()`. Por fim, o último comando atribui a classe `"Date"` para nossa variável `"Data"`.
+
+```{r}
+
+fiscal[,2:3] <- apply(X = fiscal[,2:3],
+                       MARGIN = 2,
+                       FUN = gsub, pattern = "[.]", replacement = "")
+
+fiscal[,2:3] <- apply(X = fiscal[,2:3],
+                       MARGIN = 2,
+                       FUN = gsub, pattern = ",", replacement = ".")
+
+fiscal[,2:3] <- apply(X = fiscal[,2:3],
+                       MARGIN = 2,
+                       FUN = as.numeric)
+
+fiscal$Data <- as.Date(fiscal$Data, 
+                       format = "%d/%m/%Y")
+
+```
+
+Com o tempo esse processo inicial de trabalhar com as bases de dados torna-se mais familiar, conforme vamos também criando nossas próprias preferências de como alterar as informações de nossos dados. Agora, para chegarmos até as séries utilizadas em @chernavsky2020 será preciso fazermos duas alterações: 1 - corrigir os valores correntes de ambas as variáveis pela inflação até dezembro de 2016 (último período analisado); 2 - somarmos os valores de todos os meses para obter uma série anual.
+
+Para deixar as duas séries em valor real, vamos utilizar novamente do *Sidra*, que nos disponibiliza o Índice de Preços ao Consumidor Amplo (IPCA). Nesse caso vamos precisar pegar através do `sidrar` a série `1737`, que nos traz a variação mensal do IPCA desde dezembro de 1979. Para nossos objetivos podemos restringir entre janeiro de 1997 até dezembro de 2016.
+
+```{r, message=FALSE}
+ipca <- sidrar::get_sidra(1737, # Série histórica desde 1979
+                          period = "199701-201612", # Início: jan/97 - Fim: dez/16
+                          variable = 63) # Escolher a variação mensal
+```
+
+Como já trabalhamos bastante com bases obtidas através do *Sidra*, podemos pular para a etapa de construir uma base de dados que nos seja útil a partir das informações baixadas. Para isso definiremos em `ipca` uma nova coluna `"Data"`[^5], criada a partir da função `seq.Date()` que leva desde nosso período inicial até o final, assim não precisamos reproduzir aquela série de comandos da última aula. Repare que nessa função nós estabelecemos a data de início da sequência, seu final e o tamanho do passo (em `by =`) podendo definir como dia (`"day"`), mês (`"month"`), semana (`"week"`) ou ano (`"year"`). Por último vamos deletar todas as colunas que não  `"Valor"` e renomear essa como `"IPCA"`.
+
+```{r}
+ipca$Data <- seq.Date(from = as.Date("1997-01-01"), to = as.Date("2016-12-01"), by = "month")
+
+ipca <- ipca[,c("Valor", "Data")]
+
+colnames(ipca) <- c("IPCA", "Data")
+```
+
+Agora vamos reconstruir o vetor para que ele sirva como um fator de atualização das séries em valores correntes. Como nós temos a informação da variação percentual em cada mês será preciso adotarmos algumas etapas. Nós teremos que retirar da unidade percentual, dividindo todos os valores por `100` e em seguida somarmos `1`, para que ao mutilicarmos os valores sejam apenas corrigidos de forma percentual. Agora, note que nosso vetor tem início em 1997 e termina em 2016 e nós queremos que o primeiro valor seja capaz de atualizar nossa informações de janeiro de 1997 até dezembro de 2016, ou seja, esse primeiro valor deve conter toda a inflação acumulada no período. Da mesma forma, o segundo valor do vetor deve trazer toda a inflação acumulada de fevereiro de 1997 até o final e assim sucessivamente, até o ponto em que o penúltimo elemento deve atualizar apenas de novembro de 2016 para dezembro e o último não deve alterar os dados, período de referência.
+
+Para obter algo assim vamos utilizar da função `cumprod()` que nos retorna o produto de cada elemento do vetor com todos os elementos anteriores a ele (experimente ver como ela funciona fazendo `cumprod(1:5)`). Mas agora pense o seguinte, para que a gente consiga corrigir, por exemplo, o valor de outubro de 2016 até dezembro é preciso que nosso antepenúltimo elemento do vetor contenha apenas a inflação acumulada nos meses de outubro e novembro. Ou seja, dada a estrutura da função `cumprod()` vai ser preciso criarmos o objeto `ipca.acum` invertendo nosso vetor `IPCA` e permitindo que os valores mais antigos possam ser corrigidos por toda a infação anterior. Na sequência, contudo, será preciso invertermos novamente `ipca.acum`, para que a correção que considera todo o período esteja na mesma linha do período inicial: janeiro de 1997. Nas duas inversões nós usaremos da *seleção* indicando a ordem que os elementos devem ser selecionados usando `nrow(ipca):1`.
+
+```{r}
+ipca$IPCA <- ipca$IPCA/100 + 1
+
+ipca$IPCA[nrow(ipca)] <- 1
+
+ipca.acum <- cumprod(ipca$IPCA[nrow(ipca):1])
+
+ipca$IPCA <- ipca.acum[nrow(ipca):1]
+```
+
+Repare que o fator de correção para o período inicial foi `3.503291`, ou seja, em termos percentuais trata-se de uma taxa de 250,32% - utilize a [calculadora de inflação](https://www.ibge.gov.br/explica/inflacao.php) do IBGE para conferir nossos resultados. Agora vamos recortar nossa base de dados `fiscal` para que ela tenha o mesmo período e trazer todos os valores para dezembro de 2016.
+
+```{r}
+fiscal <- fiscal[fiscal$Data <= "2016-12-01",]
+
+fiscal$Despesa <- fiscal$Despesa * ipca$IPCA
+
+fiscal$Receita <- fiscal$Receita * ipca$IPCA
+```
+
+Finalmente podemos utilizar nossos dados para gerar séries trimestrais, que formarão a base de dados usada pelos autores. Para isso vamos gerar um novo objeto que será nossa base final com o nome `base.eer` (tomando a inicial do nome de cada um deles). Como vamos precisar somar os valores dentro de cada um dos trimestres podemos criar uma nova variável que indique a qual trimestre cada uma das linhas de observação pertence e usar como critério para a seleção. Como temos 240 observações mensais e nossa base começa em janeiro do primeiro ano e termina em dezembro do último, então é fácil sabermos que serão 80 trimestres ao total. Logo, podemos usar a função `rep()` para criar uma sequência que vá de `1` até `80` repetindo cada um dos números três vezes, usando o argumento `each =`. Por fim, vamos transformar nosso
+
+```{r}
+fiscal$Tri <- rep(1:80, each = 3)
+
+base.eer <- data.frame()
+
+for (tri in 1:80) {
+  
+  receita <- sum(fiscal$Receita[fiscal$Tri == tri])
+  despesa <- sum(fiscal$Despesa[fiscal$Tri == tri])
+  
+  base.eer <- rbind(base.eer,
+                    data.frame(Receita = receita,
+                               Despesa = despesa,
+                               Tri = tri))
+                
+}
+```
+
+Com esses números, podemos observar o comportamento das duas séries ao longo do período em um gráfico parecido com o primeiro dos autores, mas nesse caso com dados trimestrais.
+
+```{r}
+plot(x = base.eer$Tri,
+     y = base.eer$Receita,
+     type = "l",
+     xlab = "Trimestre",
+     ylab = "Valores (R$ Milhões)",
+     col = "blue", 
+     main = "Fiscal - De FHC a Dilma")
+
+lines(x = base.eer$Tri,
+      y = base.eer$Despesa,
+      col = "red")
+
+legend("topleft", # Posição da legenda no gráfico (outras opções: "bottomleft", "topright", "bottomright")
+       legend = c("Receita", "Despesa"), # Títulos da legenda
+       col = c("blue", "red"), # Cores
+       pch = 16, # Formato da figura de cores
+       cex = .6) # Tamanho da fonte na legenda expressa como percentual do tamanho padrão
+```
+
+Agora vamos adicionar à nossa base de dados a últimas das variáveis fiscais usada pelos autores: o *resultado primário*. Para nós basta subtrair a despesa das receitas, dado que o *primário* é justamente a computação do saldo das contas públicas sem contar o pagamento de juros. 
+
+```{r}
+base.eer$Primario <- base.eer$Receita - base.eer$Despesa
+```
+
+### Usando o Sistema Gerenciador de Séries Temporais do BCB
+
+Das variáveis usadas pelos autores ainda nos restam o PIB, o investimento público e a dívida pública. Cada uma delas possui uma origem distinta, por isso, vamos começar com a dívida pública para usarmos as ferramentas que nos possibilitam baixar dados diretamente do [**SGS**](https://www3.bcb.gov.br/sgspub) do Banco Central do Brasil. Nesse caso não há um pacote como o `sidrar` do IBGE, é necessário buscar as informações de forma mais direta. De todo modo, depois de feita a primeira vez você pode salvar sua função que importa dados e usá-la toda vez que quiser.
+
+Aqui nós vamos criar a função `bcbsgs` que terá apenas dois argumentos: o número da série a ser importada (`serie`) e o período para qual queremos as informações (`periodo`). Enquanto a primeira informação será dada com um único número, a segunda será um vetor com duas datas escritas da maneira como o **R** consegue interpretá-las. Antes de criarmos nossa função, contudo, será preciso instalar um pacote responsável pela leitura de dados no formato JSON, no qual o BCB exporta suas informações.
+
+```{r, eval=FALSE}
+install.packages("rjson")
+```
+
+Feito isso, vamos descrever os comandos de nossa função `bcbsgs`. Em primeiro lugar ela irá definir o endereço em que o arquivo será buscado no **SGS**, para isso fará a fusão da série que escolhermos no argumento `serie` com o restante do endereço padrão do sistema. Na sequência ela utilizará da função `rjson::fromJSON()` para importar nossos dados, já usando como argumento a `url` que definimos acima. Como o objeto importado é uma lista em que cada elemento é composto por dois outros chamados `$data`e `$valor`, nós siplificamos o objeto aplicando a função `unlist()` que transforma esses dados em um único vetor no qual os elementos são nomeados como `"data"` e `"valor"`. Assim, nós formamos nossa base de dados dividindo o vetor entre os dois tipos de informação e construindo um novo `data.frame`. A última etapa, por fim, consiste em ajustar o período de interesse, para o quê é preciso primeiro atribuir a classe `"Date"` para nossa variável `data` e na sequência recortar a base de dados conforme os meses definidos em `periodo`.
+
+```{r}
+bcbsgs <- function(serie, periodo = character()) {
+
+# Definir série 
+url <- paste0("http://api.bcb.gov.br/dados/serie/bcdata.sgs.", 
+              serie,
+              "/dados?formato=json")
+
+# Baixar arquivo
+import <- unlist(rjson::fromJSON(file = url))
+
+# Criar base de dados
+dados <- data.frame(data = import[names(import) == names(import)[1]],
+                    valor = as.numeric(import[names(import) == names(import)[2]]),
+                    stringsAsFactors = F)
+
+# Definir tipos das variáveis
+dados$data <- as.Date(dados$data, "%d/%m/%Y")
+# Recortar data
+dados <- dados[dados$data >= periodo[1] & dados$data <= periodo[2],]
+
+return(dados)
+
+}
+```
+
+Apesar dessa série de Dívida Bruta do Governo Geral (série número `13672`) ter se iniciado em dezembro de 2006, devido a mudanças na metodologia, nós vamos importar utilizando todo o período das nossas variáveis. Dessa forma conseguiremos fazer os vetores de tamanho compatível e facilitará para acrescentarmos a nova variável em nossa base de dados.
+
+```{r}
+divida <- bcbsgs(serie = 13672, periodo = c("1997-01-01", "2016-12-01"))
+```
+
+Agora podemos acrescentá-la na base fiscal apenas selecionando o vetor de dívidas. 
+
+```{r}
+fiscal$Divida <- divida$valor
+```
+
+A penúltima variável usada pelos autores consiste na série do ínidice do PIB trimestral do IBGE com ajuste sazonal, tabela `1621` do Sidra.
+
+```{r}
+pib <- sidrar::get_sidra(1621, # Variável
+                         period = c("199701-201604"),
+                         classific = "C11255",
+                         category = list(C11255 = "90707")) # Selecionar índice para "PIB a preços de mercado"
+```
+
+## Buscando dados em PDFs
+
+Por fim, vamos buscar os dados para investimento público citados pelos autores do [artigo](https://www.ipea.gov.br/portal/index.php?option=com_content&view=article&id=28277) de @orair2016. Na verdade a série disponibilizada pelo autor no corpo do texto nos traz o comportamento anual do investimento e não nos serviria para os exercícios que vamos fazer. Ainda assim, vale apenas vermos como é possível extrair tabelas de arquivos PDF de uma maneira fácil através da [**tabula**](https://tabula.technology/). Primeiro vai ser preciso que você busque a *Tabela 1* do artigo de Orair e a forma mais fácil de usar a ferramenta é recortarmos o arquivo para manter apenas a página que precisamos. Há várias formas de recortarmos PDFs, inclusive com sites que fazem isso de forma gratuita, mas uma maneira bastante fácil é apenas colocarmos para imprimir em nosso *browser* (ferramenta para navegar na internet como o Chrome, Safari e etc.) No caso do Google Chrome basta escolher a opção de personalizar as páginas que serão impressas e, no nosso caso, indicar apenas a página 18 para ser impressa, como abaixo.
+
+<div class = "center">
+
+![cutepdf](C:/Users/matia/OneDrive/Documentos/Economia/Aulas/5 - ST - Coin e FIR/cutepdf.png).
+
+</div>
+
+Em seguida será preciso que você baixe a **tabula** para seu computador no site da ferrementa (basta clicar no link acima). Depois de instalada o uso da ferramenta pode assustar a primeira vista quando abriamos, afinal aparece apenas um prompt de comando preto, mas logo ele abrirá o site com uma interface mais amigável. No site precisamos selecionar o arquivo clicando no botão azul como indicado abaixo e na sequência fazendo *import*. 
+
+<div class = "center">
+  ![selecionar](C:/Users/matia/OneDrive/Documentos/Economia/Aulas/5 - ST - Coin e FIR/selecionar.png).
+</div>
+
+Na página seguinte basta grifarmos a tabela com o mouse e clicar em *Preview & Export Extracted Data* para na sequência baixar nosso arquivo.
+
+<div class = "center">
+
+ ![tabela](C:/Users/matia/OneDrive/Documentos/Economia/Aulas/5 - ST - Coin e FIR/tabela.png).
+    
+</div>
+
+Pronto, agora temos nossas séries para o investimento público em diferentes níveis de governo.
+
+```{r}
+ipub <- read.csv("tabula-td_2215p18.csv",
+                 header = T,
+                 stringsAsFactors = F)
+```
+
+Novamente seria preciso alterar os dados para conseguirmos trabalhar com eles, mas dado que essa série não será utilizada em nossos exercícios da próxima aula essa parte ficará como exercício.
+
+### Salvando nossa base de dados
+
+Por fim, a última etapa será guardarmos nossa base de dados para a próxima aula, em que vamos trabalhar apenas em cima dela. No **R** é possível criarmos arquivos de todas as extensões possíveis, o mais usual será salvarmos em *.csv*, dado que é um arquivo mais leve. Ainda assim, caso você queira salvar dados para trabalhar em outro software de análise estatística sempre é possível encontrar um pacote no **R** que compatibilize arquivos. Para o *Stata*, por exemplo, é possível utilizar o pacote `haven` para criar arquivos *.dta*. 
+
+A função para escrever arquivos é a `write.csv()`, bastante fácil de usar. Só é preciso indicar qual objeto será armazenado e qual o nome do arquivo.
+
+```{r}
+baseAula6 <- write.csv(base.eer,
+                       file = "baseAula6.csv")
+```
+
+### Exercícios
+
+**1.** Explique com suas palavras como o **R** trabalha de forma *vetorizada* para fazer a comparação dos dois vetores `receita$Data == despesa$Data` (ou seja, qual a utilidade de usarmoms a função `all()` nessa comparação?).
+
+a. Qual seria outra forma de obtermos como resposta da compração um único valor lógico comparando o vetor dado por `receita$Data == despesa$Data` com `nrow(depesa)`?
+
+**2.** Repare que no momento em que estávamos ajeitando as variáveis de `fiscal` nós utilizamos exatamente o mesmo comando trocando apenas o argumento de `pattern` e `replacement`. 
+
+a. Como você poderia escrever um *ciclo* `for` nesse trecho para que ele tomasse `pattern =` a partir de um vetor `padrao = c("[.]", ",")` e `replacement =` de um vetor `substitui = c("", ".")`? 
+
+b. Experimente usar em `pattern =` apenas `"."`, sem as chaves. Qual o resultado? Encontre na ajuda da função outros padrões como esse.
+
+c. Agora vamos falar da terceira etepa, em que definimos para o **R** que essas informações devem ser lidas como números. Explique a diferença entre as funções `as.numeric()` e `is.numeric()`. É possível converter qualquer informação em número, por exemplo `"character"` e datas?
+
+**3.** Construa um gráfico da série de investimento público de todos os níveis como proporção do PIB. Utilize a legenda para indicar cada um deles. 
+
+**4.** Note que nós não adicionamos nem a série de dívida, nem a série de PIB para nossa base de dados. Faça a transformação dos dados para se tornarem trimestrais e prepare a base que usaremos na aula seguinte.
+
+### Referências
+
+[^1]: Há uma iniciativa de permitir download de informações diretamente do **R**, tal como fazemos pelo Sidra, contudo o sistema [*API_Grandes_Numeros*](https://github.com/TesouroNacional/API_Grandes_Numeros/blob/master/API_Grandes_Numeros_STN.R) não está funcionando.Neste [artigo](https://medium.com/tchiluanda/suporte-do-rstats-%C3%A0s-iniciativas-de-transpar%C3%AAncia-do-tesouro-nacional-brasileiro-dfdd5e1ab831) o Grupo Técnico de Comunicação Estratégica e Análise de Dados da Secretaria do Tesouro Nacional, responsável pelo projeto, mostra os principais objetivos.
+
+[^2]: Trata-se da pasta que o **R** tem como referência para abrir e salvar arquivos quando acionado.
+
+[^3]: Todas as alterações são descritas na nota de rodapé número 1 do artigo.
+
+[^4]: Repare que a função `gsub` deve ser escrita sem os parênteses dentro de `apply`. Tal como discutimos na segunda aula, isso se deve à *programação funcional* que permite tomarmos uma função como argumento de outra.
+
+[^5]: Note a maneira prática de criarmos uma nova variável em nossa base de dados. Tal como nós podemos modificar nossos dados imputando valores para colunas específicas, também é possível criar novas variáveis a partir do comando `$`.
