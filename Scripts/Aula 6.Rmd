@@ -1,0 +1,231 @@
+---
+title: "Aula 6"
+author: "Matias Rebello Cardomingo"
+output: html_document
+bibliography: aula6.bib
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: center
+}
+
+</style>
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Desempenho econômico e variáveis fiscais - Análise de séries temporais
+
+Nessa aula vamos continuar a reprodução do estudo de @chernavsky2020. Agora faremos as análises da interação entre variávies fiscais e econômicas, a fim de identificar qual relação entre elas é indicada por exercícios estatísticos. Em primeiro lugar, vamos baixar a base de dados completa usada pelos autores. Como ela exige a inclusão de duas outras variáveis que não incluímos na última aula (termos de troca e juros reais[^1]), ela pode ser acessada via esse link [aqui](). Para baixar a série a partir do GitHub clique no botão Raw (canto superior direito), copie todas as informações usando `Ctrl + A`, cole em um arquivo do seu *Bloco de notas* e salve no seu *working directory*. Vamos aproveitar e abrir nossa primeira base de dados vinda de um arquivo `.txt` através da função `read.delim()`. Nesse caso, basta indicar que a seperação dos valores é feita através de `,` no argumento `sep =`.
+
+```{r}
+base.eer <- read.delim("BaseAula6.txt",
+                       sep = ",")
+```
+
+O primeiro passo será criarmos uma variável para resultado primário, dado que os autores utilizam essa variável ao invés das receitas e despesas como temos até aqui. Na sequência vamos reproduzir as análises feitas na seção 3 do artigo, para isso será preciso executarmos 4 etapas: a identificação de **raízes unitárias** nas séries, a estimação de modelos de **Vetores Auto-Regressivos**, a realização de testes de **causalidade de Granger** e, por fim, vamos obter as **Funções Impulso Resposta** dessas funções.
+
+```{r}
+base.eer$Primario <- base.eer$Receita - base.eer$Despesa
+```
+
+### Teste de raiz unitária
+
+Até agora nós não precisamos nos preocupar com o fato das séries possuírem **raiz unitária**, mas na análise de séries temporais esse é um elemento central para a validade das estatísticas de teste. Você se lembra que na **Aula 4** nós realizamos alguns testes para verificar se os resíduos de nossa regressão de galinhas em ovos (e versa e vice) tinham distribuição normal, como havíamos suposto. Pois então, quando estamos trabalhando com séries que possuem raiz unitária (diz-se também que as séries são integradas de ordem 1) é possível que os resíduos de nossa regressões não se aproximem de uma normal e, portanto, os testes de hipótese deixam de ser válidos.
+
+<div class = "bloco">
+<div class = "center">
+Séries **estacionárias**
+</div>
+
+Para que seja possível fazermos inferência da forma usual, ou seja, realizarmos os testes estatísticos que temos feito até aqui, é preciso que nossas séries sejam **estacionárias**. Isso significa que o processo gerador de dados da série não deve se alterar com o passar do tempo, ou seja, se a série segue uma distribuição normal com média zero e variância $\sigma^2$ no período $t = 0$, nós queremos que ela siga essa mesma distribuição no período $t = T$, para qualquer $T$ observado. 
+
+Como essa suposição é bastante forte, o mais usual é supormos a chamada **estacionariedade de segunda ordem**. Ou seja, supomos que a série possui os **dois primeiros momentos**, sua média e variância, constantes no tempo.
+</div>
+
+Séries que possuem **raiz unitária** não são **estacionárias** no sentido definido acima exatamente por que elas carregam eventuais choques indefinidamente, o que é chamado por **tendência estocástica**, afinal trata-se da constituição de uma tendência formada a partir de vários choques aleatórios, ao invés de uma **tendência determinística** como a série $y_t = b*t + \epsilon_t$ para um dado $b \in \mathbb{R}$. É fácil vermos a formação da **tendência estocástica** ao analisarmos a série com **raiz unitária** mais simples possível: $ y_t = y_{t-1} + \epsilon_t$, em que $\epsilon_t$ é um **ruído branco**, com distribuição normal dada por $N(0, \sigma^2)$ e $Cov(\epsilon_t, \epsilon_s) = 0$ para todo $t \neq s$. Ao expandirmos o primeiro termo do lado direito temos: $$ y_t = y_{t-2} + \epsilon_{t-1} + \epsilon_t $$ $$ y_t = y_{t-3} + \epsilon_{t-2} + \epsilon_{t-1} + \epsilon_t $$ $$\vdots$$  $$ y_t = y_{0} + \sum_{s = 1}^{t} \epsilon_{s} $$
+
+Esse último somatório constitui justamente a tendência formada por inúmeros choques aleatórios. Para identificar a violação da **estacionariedade de segunda ordem** vamos calcular a esperança e a variância de $y_t$: $$ E(y_t) \ = \ E( \sum_{s = 1}^{t} \epsilon_{s} ) \ = \ \sum_{s = 1}^{t} E( \epsilon_{s} ) = 0 $$ 
+
+Logo, a esperança independe de $t$ e respeita nossa condição de estacionaridade, contudo, veremos que a variância não tem o mesmo comportamento: $$Var(y_t) = Var(\sum_{s = 1}^{t} \epsilon_{s}) \ = \ \sum_{s = 1}^{t} Var(\epsilon_{s}) = t \sigma^2 $$
+
+Ou seja, a variância da série se torna maior conforme aumentamos o número de períodos analisados. A presença desse **passeio aleatório** (ou *random walk*) prejudica nossa estimações usuais em três aspectos principais:
+
+  **1.** Promove um viés de subestimação do parâmetro de interesse.
+  
+  **2.** Modifica a distribuição das estatísticas de teste.
+  
+  **3.** Identifica **relações espúrias** entre variáveis que apresentam **tendência estocástica**, ou seja, tendemos a rejeitar a hipótese nula de um coeficiente igual a zero mesmo quando as séries não apresentam nenhuma relação efetiva entre si[^2]. 
+
+Por todas essas razões, é preciso analisarmos a estacionariedade das séries e para isso, temos tanto métodos gráficos, quanto os testes de raiz unitária. A análise gráfica é feita através da **função de autocorrelação** (*FAC*) e da **função de autocorrelação parcial** (*FACP*). Enquanto a primeira constitui na simples autocorrelação da série, dada por $$Corr(y_t, y_{t-s}) = \frac{Cov(y_t, y_{t-s})}{Var(y_t)}$$ para $s \in [1,t]$, a *FACP* é feita através da autoregressão de $y_t - E(y_t)$ em seus valores anteriores. Ambos os métodos servem para identificarmos a ordem de séries estacionárias formadas a partir de processos $ARMA$ (auto-regressivo e média móvel) - algo que não teremos oportunidade de aprofundar nesse curso - mas elas também nos indicam a presença de raiz unitária quando seu decaimento na função de autocorrelação é muito lento, como podemos ver no caso do PIB.
+
+```{r}
+acf(base.eer$PIB) 
+```
+
+Outro método para identificar a presença de raiz unitária é realizarmos o chamado **teste de Dickey-Fuller**[^3] em que regredimos $$ y_t - y_{t - 1} = \gamma y_{t-1} + \epsilon_t $$ em que $\gamma = \phi - 1$ e temos como hipótese nula $H_0 : \gamma = 0$ e alternativa $H_a = \gamma < 0$. Como discutimos, sob $H_0$ a distribuição de $\gamma$ não segue a distribuição *t-student* e os teste de hipótese usuais não se aplicam, por isso Dickey e Fuller apresentam valores críticos para conduzirmos nossos testes. Caso nossa variável de interesse seja um modelo *auto regressivo* de ordem $p > 1$ ($AR(p)$), então nós podemos realizar o **teste aumentado de Dickey-Fuller** incluindo as defasagens da diferença da variável na forma: $$ \Delta y_t = \beta_0 + \gamma y_{t-1} + \delta_1 \Delta y_{t-1} + \delta_2 \Delta y_{t-2} + \cdots + \delta_p \Delta y_{t-p} + \omega_t $$, em que as hipóteses nula e alternativa se mantêm as mesmas. Os testes de Dickey-Fuller estão presentes no pacote `urca`.
+
+```{r, eval = FALSE}
+install.packages("urca")
+```
+
+Nele podemos encontrar não apenas o teste de Dickey-Fuller usual, mas também o *Dikcey-Fuller Generalized Least Squares* (ADF-GLS), chamado por teste ERS em homenagem aos seus autores[^4], e o *KPSS*, que é diferente dos demais ao ter como hipótese nula a estacionariedade da série, ao invés da presença de raiz unitária[^5]. Vamos utilizar aqui apenas os testes de ADF e ADF-GLS, mas nos exercícios você poderá explorar outros. Como sabemos, pelos autores, que todas as séries apresentam raiz unitária, com exceção daquela dos investimentos públicos, faremos o teste de raiz unitária apenas para a variável do PIB, com a qual já estamos trabalhando.
+
+Nessa função nós devemos fornecer 3 argumentos principais: 
+
+  **1.** Qual a tendência determinística que acreditamos estar presente na série (`type =`), por exemplo, se há um intercepto, ou tendência temporal.
+  
+  **2.** O número de defasagens da variável testada (`lags =`) que deve ser incluída como a parte *Aumentada* do teste.
+  
+  **3.** O critério de informação usado para selecionar o melhor número de defasagens a serem incluídas. Nesse caso podemos escolher entre um número fixo (`Fixed`), indicado em `lags`, ou o critério Akaike (`AIC`), ou o critério de Schwarz (`BIC`, pois é chamado de *Bayesian Information Criterion*). Esses critérios são responsáveis por ponderar entre o poder explicativo das defasagens e a parcimônia de parâmetros a serem analisados.
+
+O ideal para executar esses testes é iniciar com o modelo mais completo de todos, aquele com tendência (`type = "t"`) e analisar os testes da relevância conjunta da tendência, da constante e dos lags através das estatísticas $\phi_3$ (`phi3` no console) e $\phi_2$ (`phi2`). Essas estatísticas representam um teste F, tal como executamos na aula 4 em nossa busca pela pergunta fundamental do ovo e da galinha. Enquanto lá nós testávamos o quanto as defasagens de ovos nos ajudavam a explicar a série de galinhas (e versa e vice), aqui estamos buscando o poder explicativo dos termos determinísticos (constante e tendência).
+
+```{r}
+library(urca)
+
+ur.PIB <- ur.df(base.eer$PIB, 
+                type = "n",
+                lags = 4,
+                selectlags = "BIC")
+```
+
+Caso você peça para que o **R** imprima apenas `ur.PIB`, você verá a sequência de valores da estatística t referente à raiz unitária, de $\phi_2$ e $\phi_3$ (as estatísticas F referentes à constante e à tendência, respectivamente). Contudo, como já discutimos, dado que essas estatísticas não seguem a distribuição padrão, a função `summary` possui um método para objetos da classe `r class(ur.PIB)` que nos indicam quais são os valores críticos calculados pelos autores, como você pode ver abaixo.
+
+<div class = "center">
+
+![cutepdf](C:/Users/matia/OneDrive/Documentos/Economia/Aulas/6 - ST e EER/ur.df.png).
+
+</div>
+
+Nesse caso podemos ver que nenhum dos valores das estatísticas superam, em módulo, os valores críticos nem menos para o nível de 10% de significância. Em sendo assim, o procedimento usual seria estimarmos na sequência o modelo incluindo apenas a constante e, na ausência de uma rejeição da hipótese nula de $H_0: \phi_1 = 0$ (sendo $\phi_1$ a estatística F referente ao teste apenas com a constante), então testaríamos o modelo sem nenhum termo determinístico. Note, porém, que a estatística referente à presença ou não da raiz unitária é sempre a primeira indicada pela linha `Value of test-statistic is:` e, de fato, não podemos rejeitar a hipótese nula de que a série do PIB possui uma raiz unitária nem mesmo ao nível de 10%. Sendo assim, vamos aplicar o operador de diferenças sobre todas as nossas variáveis utilizando a função `diff =`, mas antes teremos de dessazonalizar a série de déficit primário, dado que os autores aplicam essa transformação sobre as variáveis fiscais.
+
+```{r}
+# Decompor os elementos da variável Primario
+fiscal.dec <- decompose(ts(base.eer$Primario, start = 1997, frequency = 4))
+
+# Criar o Primário dessazonalizado a partir da subtração do componente sazonal
+base.eer$Primario.Des <- base.eer$Primario - fiscal.dec$seasonal
+
+# Aplicar a primeira diferença sobre todas as variáveis
+base.dif <- as.data.frame(apply(base.eer[-1], 2, diff))
+```
+
+### Causalidade de Granger
+
+Aplicado o operador diferença em nossa série, podemos aplicar o teste de *Causalidade de Granger* aprendido na **Aula 4** para reproduzir os resultados que os autores apresentam na Tabela 1.
+
+```{r, message=FALSE}
+library(lmtest)
+
+# Resultado Primário x PIB
+grangertest(base.dif[c("Primario.Des", "PIB")]) ; grangertest(base.dif[c("PIB", "Primario.Des")])
+
+# Divida Bruta x PIB
+grangertest(base.dif[c("Divida", "PIB")]) ; grangertest(base.dif[c("PIB", "Divida")])
+```
+
+Como podemos ver, de fato a dívida pública é precedida temporalmente pelo PIB (que deve ser a interpretação desse teste), mas o contrário não é verdadeiro. Com relação ao primário, pudemos descobrir que o ajuste feito pelos autores para a correção de eventos extradionários é relevante na significância do resultaddo obtido, ainda assim, o argumento de apenas o PIB *Granger causar* o resultado primário e não o contrário se sustenta.
+
+## Estimação do modelo VAR 
+
+Agora vamos estimar estimar o mesmo modelo indicado pelos autores para obter as **funções impulso resposta**. Segundo o que eles apresentam, foram estimados uma série de modelos na forma $$x_t = A_1 x_{t-1} + \cdots + A_n x_{t-n} + B z_t + \varepsilon_t$$ em que $x_t$ seriam nossas variáveis de interesse e $z_t$ as exógenas utilizadas no modelo (nesse caso os termos de troca e os juros real). Como eles mesmos afirmam, dado que o objetivo do estudo é justamente entender a relação entre essas variáveis, todos os modelos estimados são na forma reduzida, ou seja, não incluem relações contemporâneas entre as variáveis, apenas entre suas defasagens. Dentre os vários resultados apresentados, vamos nos ater apenas ao modelo que relaciona PIB com dívida pública.
+
+O primeiro passo será utilizarmos a função `VARselect()` do pacote `vars` para selecionar quantas defasagens das variáveis dependentes deveremos incluir. Assim como no teste *ADF*, aqui utilizaremos critérios de informação para selecionar o número de defasagens ideal. Nessa função nós devemos apresentar 4 argumentos:
+
+  **1.** As variáveis dependentes que serão analisadas (`y =`)
+  
+  **2.** O número máximo de defasagens a serem testadas (`lag.max =`)
+  
+  **3.** O termo determinista a ser incluído no modelo (`type =`)
+  
+  **4.** As variáveis exógenas do modelo (`exon =`)
+  
+O resultado do teste já nos indica a melhor seleção a partir de quatro critérios distintos. Repare que será necessário fazermos uma seleção dos dados a serem utilizados em nossa base de dados a fim de excluir os valores faltantes da dívida até o final de 2006.
+
+```{r, message=FALSE, warning=FALSE}
+library(vars)
+```
+
+```{r}
+VARselect(y = base.dif[!is.na(base.dif$Divida), c("Divida", "PIB")],
+          lag.max = 5,
+          type = "c",
+          exogen = base.dif[!is.na(base.dif$Divida), c("Termos", "JuroReal")])
+```
+
+Com isso, selecionamos o modelo com apenas três defasagens e podemos estimar nosso modelo **VAR**, obtido tal como um **Mínimos Quadrados Ordinários** equação por equação, como pode ser visto na *Ajuda* da função.
+
+```{r}
+VAR.div.pib <- VAR(y = base.dif[!is.na(base.dif$Divida), c("Divida", "PIB")],
+                   p = 3, 
+                   type = "c", 
+                   exogen = base.dif[!is.na(base.dif$Divida), c("Termos", "JuroReal")])
+
+summary(VAR.div.pib)
+```
+
+Utilizando a função `summary` podemos reparar que apenas a primeira defasagem do PIB exerce uma influência com significância estatística sobre a dívida e nenhuma das variáveis exógenas aparece como relevante para explicarmos a série. De toda forma, agora podemos criar nossa própria **função impulso resposta** a partir da função `irf()`. Nela apenas precisamos indicar o modelo a ser utilizado (`x =`), a variável para a qual queremos testar o choque (`impulse =`) e aquela que será afetada por ele (`response =`), além de quantos períodos a frente queremos ver o impacto, no que faremos igual aos autores com 10 períodos (`n.ahead =`). A definição de buscar um vetor de impulsos não ortogonais (dada por `ortho = F`) se deve ao fato da ortogonalidade precisar pressupor um ordenamento das variáveis em que algumas são afetadas por todas as demais e outras apenas por seus próprios choques. Novamente, como aqui queremos estudar a relação entre essas variáveis sem pressupor nenhuma causação, então não vamos utilizar da ortogonalização.
+
+```{r}
+IRF.div.pib <- irf(x = VAR.div.pib, 
+                   impulse = "PIB",
+                   response = "Divida",
+                   n.ahead = 10,
+                   ortho = F)
+```
+
+Você pode notar que a função gera uma lista de classe `"varirf"` contendo o resultado do impulso para cada período, assim como os limites inferiores e superiores da estimação. Caso quisessemos adaptar o gráfico por completo, seria possível usarmos desses vetores armazenados na lista. Por simplicidade, vamos apenas utilizar o método da função `plot()` destinada aos objetos dessa classe. Contudo, ao invés de vermos o gráfico no próprio **R**, vamos agora salvá-lo em nosso *diretório de trabalho* utilizando a função `png()`. Nela definimos os parâmetros de tamanho do gráfico a ser produzido, podendo estabelecer como *pixels*, *centímetros* ou *inches*. Já o argumento `res =` serve para definirmos o nível de qualidade da imagem. Nessa função nós definimos as características do arquivo, criamos o gráfico a ser utilizado e, na sequência, indicamos que ele já foi 
+
+```{r}
+png("FIR.png", width = 16, height = 12, units = "cm", res = 300)
+
+plot(IRF.div.pib, main = "FIR - Dívida Bruta x PIB")
+
+dev.off()
+```
+
+### Exercícios
+
+**1.** Utilize uma nova função presentes no pacote `urca` para realizar um teste de raiz unitária em uma das séries em diferença que obtivemos.
+
+**2.** Use a função `sloop::otype()` em `ur.PIB` para identificar o tipo de objeto criado por ela. Repare que nenhum outro objeto criado nessa aula é desse mesmo tipo dentro da *linguaguem orientada por objetos* discutida na primeira aula. Esses objetos apresentam mais um nível de seleção, para os quais é preciso usarmos `@`, ao invés do `$` que estamos acostumados, você pode ver isso utilizando o `View()`. 
+
+  a. Faça um `for()` em que você armazene em uma única lista cada um dos resultados de um teste `ur.df()` para uma mesma série, mas aplicando a tendência (`type = "t"`), uma constante (`type = "d"`) e nenhum deles (`type = "n"`).
+  
+  b. Utilizando a função `lapply()`, retire de cada elemento da lista (com `@`) as estatísticas de teste (`teststat`) e seus valores críticos (`cval`).
+  
+  c. Você consegue pensar em uma maneira de pedir para que o **R** compare as estatísticas que você obteve com seus respectivos valores críticos a 5% de significância?
+
+**3.** Os critérios de informação que discutidos acima são calculados da seguinte forma: $$AIC = p * 2 + T * ln(SQR)$$ $$BIC = p * ln(T) + T * ln(SQR)$$ sendo $p$ o número de parâmetros, $T$ o número de períodos e $SQR$ a soma do quadrado dos resíduos. A comparação dos modelos é feita através da seleção daquele que apresentar o menor valor para cada critério. O BIC é dito ser mais parcimonioso, ou seja, leva à adoção de modelos com menor número de coeficientes estimados. Por que isso acontece?
+
+**4.** O pacote `dynlm` fornece a possibilidade de estimarmos modelos dinâmicos com uma notação mais simplificada do que aquela que fizemos na **Aula 4**, por exemplo. Quando escrvemos a `formula` na função `dynlm()` podemos indicar defasagens com `L(variavel, nº defasagens)`, assim como diferenças podem ser indicadas por `D(variavel, nº de diferenças)`. Utilize essa função para realizar uma das regressões de nosso modelo VAR da aula e compare seus resultados.
+
+### Referências
+
+[^1]: A série de termos de troca utilizada pelos autores é disponibilizada pela Funcex, mas como seu acesso não é dos mais fáceis, utilizamos a série de termos de troca de commodities produzida pelo [FMI](https://data.imf.org/?sk=2CDDCCB8-0B59-43E9-B6A0-59210D5605D2). Ainda que não sejam exatamente iguais, parte relevante de nossas exportações são commodities e, portanto, para o nosso caso serve como uma boa aproximação. Já a série de juros reais foi elaborada a partir da subtração da taxa Selic anualizada (série 1178 do SGS-BCB) pelo IPCA acumulado de 12 meses (série 1737 do Sidra-IBGE). Note que ainda assim nossa base final ainda conta com uma variável a menos do que aquelas utilizadas por eles, dado não tivemos acesso à série trimestral de investimentos públicos. Todas as variáveis foram inseridas como valor médio no trimestre.
+
+[^2]: Nesse [site](https://www.tylervigen.com/spurious-correlations) você pode encontrar vários exemplos de **relações espúrias** de séries sem nenhuma relação entre si.
+
+[^3]: Nomeado em homenagem aos pesquisadores [Wayne Fuller](https://en.wikipedia.org/wiki/Wayne_Fuller) e [David Dickey](https://en.wikipedia.org/wiki/David_Dickey), respectivamente, orientador e orientando na Universidade de Ohio que apresentaram o teste em @dickey1979.
+
+[^4]: Graham Elliot, Thomas Rothenberg e James Stock, o artigo original, publicado na Econometrica em 1996 pode ser encontrado [aqui](https://www.ssc.wisc.edu/~bhansen/718/ElliottRothenbergStock.pdf).
+
+[^5]: Aqui também o nome do teste é em homenagem aos autores: Denis Kwiatkowski, Peter Phillips, Peter Schmidt e Yongcheol Shin. O artigo original, de 1992, está disponível [aqui](https://debis.deu.edu.tr/userweb/onder.hanedar/dosyalar/kpss.pdf).
