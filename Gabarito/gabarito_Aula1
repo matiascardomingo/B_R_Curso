@@ -1,0 +1,86 @@
+#EXERCICIOS E GABARITO
+
+#1
+c
+seq(from = 5, to = 10, along.with = c)
+seq_along(c)+4
+
+#2
+#aprender a consultar a documentaÃ§Ã£o do R 
+
+?seq_along
+
+?g
+?f
+?d
+
+#3
+
+e
+dimnames(e)
+k <- matrix(data = e[1,1,1], ncol = 1, nrow = 1) 
+colnames(k) <- "esq"
+rownames(k) <- "topo"
+
+k
+
+#4
+c
+class(c)
+length(c)
+# length nos da o numero de elementos do vetor
+
+d
+class(d)
+length(d)
+# length nos da o numero de elementos da matrix
+
+f
+class(f)
+length(f)
+
+f[1]
+class(f[1])
+length(f[1])
+#length nos dÃ¡ a quantidade de objetos dentro da lista, mesmo que esses objetos
+# sejam listas de listas
+
+g
+class(g)
+length(g)
+#length nos da a quantidade de vetores, isto Ã© colunas
+
+#5
+
+#descobrindo o que as funÃ§Ãµes factor e sample fazem?
+
+?factor
+# a funÃ§Ã£o factor nos permite codificar
+#um vetor em alguns tipos de categorias
+
+
+?sample
+# a funÃ§Ã£o sample nos permite gerar obs aleatorias
+# com determinadas propriedades (probs, com ou sem reposiÃ§Ã£o)
+
+#combinando as duas fnÃ§Ãµes para gerar uma amostra de 200 observaÃ§Ãµes
+# com a distribuiÃ§Ã£o da PEA
+
+pea <- factor(x = c("formal", "informal", "conta propria"))
+sample(pea, size = 200, replace = T, prob = c(.3, .4, .3))
+
+#6
+#a
+f
+sum(f[[3]])
+
+#b
+f
+f[2] <- paste("ab")
+f
+
+#c
+
+#duvidas aqui
+g[1,]
+g[6,]
