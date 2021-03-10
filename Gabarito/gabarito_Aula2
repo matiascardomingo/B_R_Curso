@@ -1,0 +1,230 @@
+#Exercicios
+
+#1
+
+T+T
+T+F
+F+F
+T*F
+T*T
+F*F
+
+#o R interpreta T como igual ao numerico 1 e F como o numerico 0
+
+#recriando o objeto estat.list
+
+
+estat <- data.frame()
+
+for (UF in unique(pim$`Unidade da Federação`)) {
+  
+  for (setor in unique(pim$`Seções e atividades industriais (CNAE 2.0) (Código)`)) {
+    
+    info <- summary(pim$Valor[pim$`Unidade da Federação` == UF & 
+                                pim$`Seções e atividades industriais (CNAE 2.0) (Código)` == setor &
+                                !is.na(pim$Valor)])
+    
+    setor.UF <- cbind(data.frame(UF = UF, Setor = setor),
+                      matrix(info,
+                             nrow = 1,
+                             dimnames = list(NULL, c(names(info)))))
+    
+    
+    estat <- rbind(estat, setor.UF)
+    
+  }
+  
+}
+
+estat.list <- split(x = estat, f = estat$Setor)
+lapply(estat.list, is.na)
+
+
+#inspecionando o objeto estat.list
+
+class(estat.list)
+str(estat.list)
+
+View(estat.list)
+
+
+# Agora, atenção, essa será a parte complicada!
+
+#O for abaixo pode ser lido da seguinte forma: para cada setor diferente em estat.list
+#lembre-se que a função seq_along cria uma indexação a partir dos elementos da lista
+# -> rever aula 1 para quaisquer duvidas sobre a função seq_along()
+
+for (setor in seq_along(estat.list)){ 
+  
+  # agora que abrimos a chave, vamos descrever o que deve ser feito 
+  # dentro do ambiente criado pelo for
+  
+  # na linha abaixo, ordenamos que o objeto info.setor armazene os elementos de estat.list
+  # agrupados por setores -> [[setor]] indica essa info, na coluna de medias -> $mean indica isso.
+  # que somados sejam todos falsos, isto é, == 0. lembre-se que um True ja adicionaria o valor 1 na soma
+  
+  info.setor <- c(info.setor, sum(is.na(estat.list[[setor]]$Mean)) == 0)
+  
+  # na linha abaixo, vamos nomear os elementos do vetor info.setor  
+  
+  names(info.setor) <- c(names(info.setor)[-length(info.setor)], names(estat.list[setor]))
+  
+  
+}
+
+
+# como resposta temos um vetor que nos informa quais setores possuem todos os valores
+# True para is.na(), ou seja, todos os valores faltantes. 
+# perceba que na segunda linha do codigo dentro das chaves, 
+# buscamos -length(info.setor) de forma que o que antes procuravamos == 0, isto é, F
+# agora é seu oposto, True.
+# Observe no console que as colunas que apresentam todos os valores faltantes 
+# são justamente aquelas que em nosso info.setor estão marcadas como True
+
+# names(info.setor)[-length(info.setor)] -> como o vetor names(info.setor)
+# nao possui nomes, essa parte a cada ciclo retira seu ultimo valor ao mesmo tempo em que o 
+# segundo argumento do vetor [ names(estat.list[setor]] adiciona a cada ciclo o nome dos setores
+# de estat.list
+
+
+info.setor <- c()
+for(setor in seq_along(estat.list)){
+  
+  info.setor <- c(info.setor, sum(is.na(estat.list[[setor]]$Mean)) == 0)
+  names(info.setor) <- c(names(info.setor)[-length(info.setor)], names(estat.list[setor]))
+  
+  
+  
+  
+  
+}
+
+info.setor
+
+#primeiro: escrever o que se deseja
+    # quero a partir de estat.list, checar qual setor apresenta todos os valores
+    # NA para a coluna mÃ©dia. Ou seja, preciso checar primeiro qual o tipo de objeto
+    # estat.list
+
+class(estat.list)
+typeof(estat.list)
+str(estat.list)
+
+#estat.list Ã© uma lista e estÃ¡ dividida entre cada setor expressado por seu codigo
+#dentro de cada codigo de setor, exstem 4 (uma para cada estado) de 8 variaveis:
+# UF, SETOR, MIN, PRIMEIRO QUANTIL, MEDIANA, MEDIA, TERCEIRO QUANTIL, MAXIMO
+
+#Segundo passo, organizar nosso for
+
+#criar um vetor em que armazenaremos as infos que serao armazenadas pelo for
+
+armazenar_infos <- c()
+
+for(setor in seq_along(estat.list)){
+  
+  armazenar_infos <- c(armazenar_infos, sum(is.na(estat.list[[setor]]$Mean)))
+  names(armazenar_infos) <- c(names(armazenar_infos)[-length(armazenar_infos)], 
+                              names(estat.list[setor]))
+}
+
+armazenar_infos
+
+
+#2
+
+# queremos reproduzir o efeito do for abaixo a partir da funÃ§Ã£o apply
+
+#for (variavel in colnames(pim)) { 
+
+#print(paste(variavel, "possui", length(unique(pim[,variavel])), "valores distintos"))
+
+#}
+
+
+
+# sabemos o que queremos: precisamos que nossa funÃ§Ã£o apply nos informe no objeto pim
+#quais colunas possuem apenas um unico valor
+
+#vamos baixar a tabela pim original novamente
+
+pimdenovo <- sidrar::get_sidra(3653, # x = sÃ©rie a ser obtida
+                         variable = 3135, # Ãndice dessazonalizado com mÃ©dia de 2012 = 100
+                         period = "200201-202011", # InÃ­cio e fim da amostra "AAAAMM-AAAAMM"
+                         classific = "C544", # Escolher setores especÃ­ficos
+                         category = list("C544" = c(129315, 129330, 129333, 129335, 129337)), # Extrativa / FarmoquÃ­micos e FarmacÃªuticos / Metalurgia / InformÃ¡tica / MÃ¡quinas e equipamentos
+                         geo = "State", # Escolher UF
+                         geo.filter = list("State" = c(31, 15, 43, 35)))  # MG / PA / RS / SP 
+str(pimdenovo)
+
+
+resposta <- apply(X = pimdenovo, FUN = function(coluna) length(unique(coluna)), MARGIN = 2)
+resposta
+
+
+#3
+
+#agora queremos entender como funciona o seguinte for
+
+#estat <- data.frame()
+
+#for (UF in unique(pim$`Unidade da FederaÃ§Ã£o`)) {
+  
+# for (setor in unique(pim$`SeÃ§Ãµes e atividades industriais (CNAE 2.0) (CÃ³digo)`)) {
+    
+#  info <- summary(pim$Valor[pim$`Unidade da FederaÃ§Ã£o` == UF & 
+#                            pim$`SeÃ§Ãµes e atividades industriais (CNAE 2.0) (CÃ³digo)` == setor &
+#                             !is.na(pim$Valor)])
+    
+#    setor.UF <- cbind(data.frame(UF = UF, Setor = setor),
+#                      matrix(info,
+#                            nrow = 1,
+#                             dimnames = list(NULL, c(names(info)))))
+    
+    
+#   estat <- rbind(estat, setor.UF)
+    
+  #}
+  
+#}
+
+#a para a criaÃ§Ã£o do objeto UF.Setor, foi utilizada a funÃ§Ã£o cbind,
+#a funÃ§Ã£o data.frame e afunÃ§Ã£o matrix. Se utilizassemos apenas a funÃ§Ã£o matrix, 
+#todos os objetos seriam transformados em character, pois matrix Ã© uma classe homogenea
+
+
+#utilizamos a funÃ§Ã£o matrix para juntar as infos do vetor info, pois ela nos permite
+# organizar os dados de tal forma que eles combinam com o data.frame
+
+#b
+#a funcao matrix permite colocar os dados em uma unica linha, por isso
+# utilizamos os argumentos nrow = 1
+
+#c
+class(setor.UF)
+#data.frame Ã© a classe do  objeto setor.uf
+# isso nos diz que quando juntamos uma matriz com um data frame 
+# o R le o objeto resposta como um data frame, pois este é um objeto heterogeneo e matrizes nao
+# e o R sempre transforma um tipo de informacao mais simples em informacaoes mais complexas
+# experiemnto juntar um vetor de objetos de tipo character com um vetor de doubles e 
+#veja o resultado final
+
+
+#4
+
+summary.default
+
+#olhar esse trecho do codigo
+
+#else if (is.numeric(object)) {
+#  nas <- is.na(object)
+#  object <- object[!nas]
+#  qq <- stats::quantile(object, names = FALSE, type = quantile.type)
+#  qq <- c(qq[1L:3L], mean(object), qq[4L:5L])
+#  if (!missing(digits)) 
+#    qq <- signif(qq, digits)
+#  names(qq) <- c("Min.", "1st Qu.", "Median", 
+#                 "Mean", "3rd Qu.", "Max.")
+#  if (any(nas)) 
+#    c(qq, `NA's` = sum(nas))
+#  else qq
+#}
