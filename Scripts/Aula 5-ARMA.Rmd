@@ -1,0 +1,315 @@
+---
+title: "Aula ARMA"
+author: "Matias Rebello Cardomingo"
+output: html_document
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: center
+}
+
+</style>
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Séries Auto Regressivas e de Média Móvel
+
+Na última aula estudamos o comportamento das séries que descrevem o número de galinhas poedeiras e o número de ovos produzidos no Brasil. Em nossa análise, a fim de identificar quem chegou primeiro "o ovo ou a galinha", nós decompusemos a série entre **tendência**, **efeito sazonal** e **resíduo**. Na sequência, para realizarmos o teste de *causalidade de Granger*, também estudamos a distribuição dos resíduos de nossas regressões em que testávamos a relevância de defasagens de cada uma das séries na explicação da outra. 
+
+Na aula de hoje vamos discutir um pouco sobre sobre o **resíduo** que obtivemos nessa decomposição e de que forma ele pode ser modelado para fazermos previsões. Para isso nós utilizamos da família de modelos **ARMA**, do inglês *Auto Regressive* (*Auto Regressivo*) e *Moving Average* (*Média Móvel*). No primeiro caso trata-se de **processos estocásticos**, ou seja, **processos geradores de dados aleatórios** no qual os valores presentes dependem apenas dos valores passados assumidos pela série mais um choque contemporâneo, por exemplo um processo AR(1): $$ y_t = \phi_1 y_{t-1} + \epsilon_t $$
+
+Já no caso de processos de *Média Móvel* o valor presente da série depende apenas de choques anteriores, no caso de um MA(1): $$ y_t = \epsilon_t - \theta_1 \epsilon_{t-1} $$. Para ambos, consideramos que $\epsilon_t$ é um **ruído branco**, com distribuição normal dada por $N(0, \sigma^2)$ e $Cov(\epsilon_t, \epsilon_s) = 0$ para todo $t \neq s$. Nesse caso escrevemos uma subtração dos coeficientes apenas para tornar futuras demonstrações um pouco mais intuitivas, mas basta pensar que poderíamos trabalhar com o inverso de cada um deles. A importância dessa família de modelos está no fato dela fornecer um instrumento útil para reproduzirmos **séries estacionárias** como os **resíduos** da decomposição. 
+
+<div class = "bloco">
+<div class = "center">
+Séries **estacionárias**
+</div>
+
+Para que seja possível fazermos inferência da forma usual, ou seja, realizarmos os testes estatísticos que temos feito até aqui, é preciso que nossas séries sejam **estacionárias**. Isso significa que o processo gerador de dados da série não deve se alterar com o passar do tempo, ou seja, se a série segue uma distribuição normal com média zero e variância $\sigma^2$ no período $t = 0$, nós queremos que ela siga essa mesma distribuição no período $t = T$, para qualquer $T$ observado. 
+
+Como essa suposição é bastante forte, o mais usual é supormos a chamada **estacionariedade de segunda ordem**, ou **estacionariedade fraca**. Ou seja, fazemos duas imposições às séries:
+
+*1ª* - A série possui os **dois primeiros momentos** (média e variância) constantes no tempo: $$ E(x_t) = \mu, \ t \in [0, \infty] $$ $$Var(x_t) = \sigma^2, \ t \in [0, \infty] $$
+
+*2ª* - A covariância entre duas observações em momentos diferentes do tempo depende apenas do número de períodos entre elas: $$Cov(y_t, y_{t-s}) = f(s)$$
+</div>
+
+## AR
+
+No caso dos processos *Auto Regressivos* há uma condição para que eles respeitem a *estacionariedade fraca*: eles devem ter coeficientes $\phi$ tais que os choques sofridos a cada período se dissipem ao longo do tempo. Ou seja, retomando nosso modelo simples e expandindo os termos da defasagem de forma sucessiva temos: 
+$$ y_t = \phi_1 (\phi_1 y_{t-2} + \epsilon_{t-1}) + \epsilon_t $$ 
+$$ y_t = \phi_1^2 (y_{t-3} + \epsilon_{t-2}) + \phi_1  \epsilon_{t-1} + \epsilon_t $$ 
+$$ y_t = \phi_1^3 (y_{t-4} + \epsilon_{t-3}) + \phi_1^2  \epsilon_{t-2} + \phi_1  \epsilon_{t-1} + \epsilon_t $$ 
+
+Nesse caso é fácil ver que caso $\phi_1 < 1$, então $\phi_1^n \to 0$ para $n \to \infty$ e o impacto dos choques passados se dissipa com o passar do tempo. Como veremos adiante, $\phi$ ser menor que a unidade consiste na *condição de estacionariedade* desta série. Antes de seguirmos, vamos criar uma série AR(1) no **R** de 100 observações.
+
+```{r}
+set.seed(1313) # Definir o padrão para o R gerar séries aleatórias
+
+AR <- eps <- rnorm(n = 200) # Produzir 200 observações com distribuição normal
+
+for (t in 2:200) AR[t] <- 0.5 * AR[t - 1] + eps[t]
+
+AR <- AR[101:200]
+
+plot(AR, type = "l", xlab = "t")
+```
+
+Isso pode ser visto de maneira mais formal quando analisamos a solução do *polinômio característico* associado à série. Trata-se de algo muito além do nosso interesse, por isso vamos repassar de forma breve, apenas para nos familiarizarmos de forma breve com a intuição. Então, vamos voltar para nosso modelo e empregar o uso do *operador defasagem* ($L$), tal que $Ly_t = y_{t-1}$, $L^2 y_t = y_{t-2}$ e assim sucessivamente. Muito bem, então podemos reescrever nosso AR(1) da seguinte forma: 
+
+$$ y_t - \phi_1 y_{t-1} = \epsilon_t $$ 
+$$ y_t (1 - \phi_1 L) = \epsilon_t $$
+Então, nosso *polinômio característico* é dado por: $1 - \phi_1 L = 0$. É comum vermos um abuso de notação em que consideramos $L$ nossa variável a ser determinada (trata-se de um abuso exatamente porque $L$ consiste em um operador, é como se estivéssemos atribuindo um valor para o operador soma ($+$), ainda assim, vamos seguir o padrão). A raiz dessa equação, portanto, é $L = \frac{1}{\phi_1}$, logo, a **condição de estacionariedade** determina que a *raiz do polinômio característico* é maior do que a unidade, em termos absolutos[^1], exatamente porque se $\phi_1 < 1 \implies L > 1$ . 
+
+Sendo assim, podemos obter os dois primeiros momentos de $y_t$: $$ E(y_t) = E(\phi_1 y_{t-1} + \epsilon_t) $$ $$ E(y_t) = \phi_1 E(y_{t-1}) + E(\epsilon_t) $$ $$ \mu_x (1 - \phi_1) = E(\epsilon_t) $$ $$ \mu_x = \frac{0}{1 - \phi_1} = 0 $$
+
+Da mesma forma $$ Var(y_t) = Var(\phi_1 y_{t-1} + \epsilon_t) $$ $$ Var(y_t) = \phi_1^2 Var(y_{t-1}) + \sigma^2 $$ $$ Var(y_t) = \frac{\sigma^2}{1 - \phi_1^2} = \gamma_0 $$
+
+A partir dessas derivações, é interessante notar o paralelismo sempre possível de ser estabelecido entre séries AR e MA estacionárias. Modelos AR($p$) de ordem finita, podem sempre serem transformados em modelos MA($\infty$) a partir exatamente da definição de estacionariedade, afinal, para $\phi < 1$, você pode notar que $y_t$ pode ser reescrito como a soma de uma PG infinita.
+
+$$ y_t = \frac{\epsilon_t}{(1 - \phi_1 L)} = \sum_{s = t}^{\infty} \phi_1^t \epsilon_s $$
+
+Na próxima aula veremos o que acontece com a série quando $\phi_1 = 1$, trata-se do caso em que ela é **integrada** (o I de modelos da família ARIMA), ou possui uma **raiz unitária**. Nesses casos é preciso trabalharmos com a série em diferenças. Derivada teoricamente, podemos calcular a média e a variância da nossa série `x`.
+
+```{r}
+mean(AR) ; var(AR)
+```
+
+Dado que a série respeita a primeira condição da estacionariedade fraca, vejamos se ela respeita a segunda, ou seja, se a covariância entre os períodos depende exclusivamente do intervalo de tempo entre eles. Vamos identificar a auto-covariância de $y_t$ com um período de defasagem. 
+
+$$ Cov(y_t, y_{t-1}) = Cov(\phi_1 y_{t-1} + \epsilon_t, y_{t-1})$$
+
+$$ \phi_1 Cov(y_{t-1}, y_{t-1}) + Cov(\epsilon_t, y_{t-1}) $$
+
+$$ \phi_1 Var(y_{t-1}) + 0 $$
+
+$$ \phi_1 * \gamma_0 $$
+
+Logo, a autocorrelação para um período de defasagem, ou seja, auto-covariância dividida pela variância da série, é dada por: 
+
+$$ \rho_1 = \frac{\phi_1 * \gamma_0}{\gamma_0} = \phi_1 $$
+
+Note que ao fazer esse cálculo no **R** o valor não será exatamente aquele que definimos na criação da série `x`.
+
+```{r}
+cov(AR[2:100], AR[1:99]) / var(AR)
+```
+
+Contudo, é interessante notar que se estimarmos o coeficiente através da função `lm` obtemos um valor bastante parecido a esse, nos exercícios vamos voltar a esse assunto.
+
+```{r}
+AR.lm <- lm(AR[2:100] ~ AR[1:99])
+
+summary(AR.lm)
+```
+
+O fato do valor do coeficiente não coincidir com aquele do **processo gerador de dados** consiste exatamente na variação estatística que temos quando aproximamos o modelo populacional a partir de uma amostra finita. Contudo, sendo um **estimador não viesado**, ou seja, que somos capazes de estimar sem erros, então o *intervalo de confiança* do coeficiente estimado deve incluir o valor populacional.
+
+```{r}
+confint(AR.lm, level = .95) # Intervalo de confiança
+```
+
+Esse resultado para um nível de confiança de 95% nos indica que, em média, a cada 100 vezes que estimarmos o coeficiente, em 95 delas ele estará dentro desse intervalo. 
+
+Você também poderá verificar nos exercícios que a **Função de Autocorrelação (FAC)** de um processo AR(1) apresenta a seguinte forma: $\rho_k = \phi_1^k$, ou seja, há um decaimento exponencial de seu valor que pode ser notado como no gráfico a seguir.
+
+```{r}
+acf(AR)
+```
+
+Já a **Função de Autocorrelação Parcial (FACP)** consiste na estimação de $\rho_k$ em todas as autocorrelações anteriores, para as quais $t < k$. No caso dos modelos AR vamos identificar que a **FACP** torna-se nula para todas as defasagens maiores do que a própria ordem da série. Ou seja, um AR($p$) terá sua **FACP** igual a zero para todo $k > p$. Assim, dizemos que a identificação de uma série AR pode ser feita por um decaimento exponencial de sua **FAC** e um truncamento, para alguma ordem de defasagem, para sua **FACP**.
+
+```{r}
+pacf(AR)
+```
+
+## MA
+
+Processos de **média móvel** de ordem finita também são estacionários como podemos notar no caso de um MA(1): $$ E(y_t) = E(\epsilon_t - \theta_1 \epsilon_{t-1}) $$ $$ E(y_t) = E(\epsilon_t) - \theta_1 E(\epsilon_{t-1}) = 0 $$ $$ Var(y_t) = Var(\epsilon_t - \theta_1 \epsilon_{t-1}) $$ $$ Var(y_t) = Var(\epsilon_t) + \theta_1^2 Var(\epsilon_{t-1}) = \sigma^2 (1 + \theta_1^2) $$ 
+
+Logo, nenhum dos dois primeiros momentos é indexado pelo tempo, ou seja, ambos são invariantes ao longo dos períodos. Da mesma forma, a autocorrelação da série depende exclusivamente de sua ordem, contudo, no caso de um modelo MA($q$) sua **FAC** será truncada na ordem $q$. 
+
+$$ Cov(y_t, y_{t-1}) = Cov(\epsilon_t - \theta_1 \epsilon_{t-1}, \epsilon_{t-1} - \theta_1 \epsilon_{t-2}) $$
+
+$$ Cov(y_t, y_{t-1}) = Cov(\epsilon_t, \epsilon_{t-1}) - \theta_1 Cov(\epsilon_t, \epsilon_{t-2}) - \theta_1 Cov(\epsilon_{t-1}, \epsilon_{t-1}) + \theta_1^2 Cov(\epsilon_{t-1}, \epsilon_{t-2}) $$
+
+$$ Cov(y_t, y_{t-1}) =  - \theta_1 Var(\epsilon_{t-1}) = - \theta_1 \sigma^2 $$
+
+Logo, a **autocorrelação parcial** para um período igual a $\rho_1 = \frac{- \theta_1 \sigma^2}{\sigma^2 (1 + \theta_1^2)} = \frac{- \theta_1}{(1 + \theta_1^2)}$. Por fim, é importante destacar que **condição de estacionariedade** dos modelos AR se tornam a **condição de invertibilidade** das funções MA, que permitem transformar um MA($q$) em um AR($\infty$). 
+
+$$ \epsilon_t = \frac{y_t}{(1 + \theta_1 L)} = \sum_{s = i}^{\infty} \theta_1^i y_{t-i} $$
+
+A título de exemplo vamos analisar o comportamento do processo ARMA(1,3) descrito por: $$ y_t = - 0.9 y_{t-1} + \epsilon_t + 0.5 \epsilon_{t-1} + 0.4 \epsilon_{t-2} + 0.3 \epsilon_{t-3} $$
+
+Em primeiro lugar vamos reescrever a série separando entre seu componente autoregressivo e seu componente de média móvel, ou seja: $$ y_t (1 + 0.9 L) = (1 + 0.5 L + 0.4 L^2 + 0.3 L^3) \epsilon_t $$
+
+É fácil notar que o componente auto regressivo da série respeita a condição de estacionariedade, afinal há uma única raiz para a equação característica, de tal forma que $L = \frac{1}{.9} > 1$. Agora, para analisar a invertibilidade do componente MA vamos transformar nossas variáveis da equação característica definindo $x = \frac{1}{L}$, de tal forma que possamos dividir os dois lados da equação característica por $x^3 = \frac{1}{L^3}$: $$ 1 + 0.5 L + 0.4 L^2 + 0.3 L^3 = x^3 + 0.5 x^2 + 0.4 x^3 + 0.3 = 0 $$
+
+Agora podemos utilizar da função `polyroot()`para ober as raízes dessa equação. Nele precisamos fornecer o valor dos coeficientes considerando em ordem crescente os graus de nossa variável:
+
+```{r}
+raizes <- polyroot(z = c(0.3, 0.4, 0.5, 1))
+
+raizes
+```
+
+Como podemos ver, o polinônmio de terceiro grau possui duas raízes imaginárias (`r raizes[c(1,3)]`) e uma raiz real (`r raizes[2]`). A parte real das duas raizes imaginárias são menores do que 1, logo $L_1 = \frac{1}{x_1} = \frac{1}{0.063} > 1$, da mesma forma como a única raiz real também apresenta valor menor que a unidade. Logo, esse processo ARMA(1,3) é estacionário e inversível.
+
+## Previsões
+
+Certo, agora que vimos um pouco do funcimento dessas séries, vamos construir uma previsão um ano a frente para as séries de ovos e galinhas. Em primeiro lugar, vamos construir a base de dados usada na última aula.
+
+```{r}
+pog <- sidrar::get_sidra(915,
+                         period = "198701-202003",
+                         variable = c(1988, 29), 
+                         classific = "C12716",
+                         category = list("C12716" = 115236))
+
+BasePog <- ts(cbind(pog$Valor[pog$`Variável (Código)` == 29],
+                       pog$Valor[pog$`Variável (Código)` == 1988]),
+              start = c(1987, 01),
+              frequency = 4,
+              names = c("Ovos", "Galinhas"))
+
+```
+Apenas para relembrarmos, vamos ver o gráfico de ambas as séries:
+
+```{r}
+plot(BasePog)
+```
+
+Agora, assim como fizemos com a função `decompose()`, nós vamos decompor nossa série entre uma **tendência**, um componente **sazonal** e os resíduos, que serão modelados por um processo ARMA. A tendência será construída com uma variável contando todos os 135 períodos. Para não precisarmos impor nada muito restritivo ao nosso modelo, vamos regredir nossa série permitindo que ela seja descrita por um polinômio de até quarta ordem, apesar do gráfico não sugerir ser necessário algo muito além da segunda (pelo formato convexo da curva, ou sua barriga para cima). Ao mesmo tempo vamos incluir um elemento sazonal captado pela função `cycle()`, que identifica a frequência atribuída aos objetos da classe `ts`.
+
+```{r}
+# Tendência
+tend <- 1:135
+
+# Sazonalidade
+sazo <- cycle(BasePog)
+
+# Obter tendência e sazonalidade
+galinha.lm <- lm(Galinhas ~ tend + I(tend^2) + I(tend^3) + I(tend^4) + as.factor(sazo),
+               data = BasePog) 
+
+ovos.lm <- lm(Ovos ~ tend + I(tend^2) + I(tend^3) + I(tend^4) + as.factor(sazo),
+               data = BasePog) 
+
+# Resultados
+summary(galinha.lm) ; summary(ovos.lm)
+```
+
+Como podemos ver, os coeficientes associados à tendência elevada ao cubo e à quarta mostraram significantes, diferente do que a primeira inspeção visual poderia sugerir. Agora nós vamos utilizar o **critério de informação** de *Schwarz* para definir de qual ordem é o processo ARMA capaz de descrever os resíduos de nossas regressões. **Critérios de informação** são responsáveis por ponderar entre o poder de explicação de um modelo o número de parâmetros estimado por ele, o ideal é explicarmos o máximo da variação de nossa variável dependente, estimando o mínimo de parâmetros necessários. No caso do critério de *Schwarz* ou também chamado como *Bayesiano* (BIC), o cálculo feito é $BIC = p * ln(T) + T * ln(SQR)$ sendo $p$ o número de parâmetros, $T$ o número de períodos e $SQR$ a soma do quadrado dos resíduos, o modelo que atingir menor valor no critério $BIC$ será considerado o melhor.
+
+No ciclo `for` abaixo nós vamos selecionar um modelo testando a possibilidade do resíudo ser formado por uma série com componentes ARMA até a ordem ARMA($p$ = 7, $q$ = 7). Como vamos iniciar sem nenhum modelo, também definimos o valor infinito para o objeto BIC, que será atualizado a cada teste dos modelos, sempre que o novo critério for menor que o anterior. Repare que o ciclo é duplo, ou seja, ele testa todos valores `q` para cada valor `p`, a fim de varrer todas as opções.
+
+```{r, warning=FALSE}
+ordem <- c(0, 0, 0)
+BIC <- Inf
+
+for (p in 0:4) for (q in 0:4) {
+  
+  # Identificar critério BIC de cada modelo
+  fit.BIC <- BIC(arima(resid(galinha.lm), order = c(p, 0, q)))
+  
+  # Atualizar o modelo para cada AIC melhor que o anterior
+  if (fit.BIC < BIC) {
+    ordem <- c(p, 0, q)
+    galinha.arma <- arima(resid(galinha.lm), order = ordem)
+    BIC <- fit.BIC
+  }
+  
+}
+
+# Modelo escolhido
+galinha.arma
+```
+
+Também é possível fazermos essa seleção do modelo através do pacote `forecasts` (previsão, em inglês).
+
+```{r, eval=FALSE}
+install.packages("forecasts")
+```
+
+Nele podemos utilizar da função `auto.arima()` para que o próprio **R** busque o melhor modelo família ARMA. Nesse caso nós podemos indicar qual ordem máxima queremos avaliar para cada um dos componentes (`max.p =` e `max.q =`).
+
+```{r, warning=FALSE, message=FALSE}
+library(forecast)
+
+auto.arima(resid(galinha.lm), max.p = 4, max.q = 4)
+```
+
+Podemos notar que ambos os comandos levam a uma mesma conclusão de análise: a seleção de um modelo AR(1). Agora podemos unir a parte determinística de nosso modelo com sua parte estocástica que acabamos de modelar. Para isso vamos estabelecer os dados que serão usados pela parte determística, ou seja, variáveis para a tendência temporal e o efeito sazonal.
+
+```{r}
+deterministico <- data.frame(tend = seq(136, length = 4), sazo = c(4,1:3))
+
+# Previsão modelo
+galinha.det <- predict(galinha.lm, deterministico)
+```
+
+Por fim, fazemos a previsão do resíduo e somamos ambas as partes. Repare que será preciso transformarmos a previsão em um objeto da classe `"ts"`, a fim de conseguirmos definir o gráfico formado a partir de duas séries distintas. Para essa definição usamos a função `end()` a fim de obter o último período de `BasePog`, além de incluirmos a última observação da série, para que a série da previsão se ligue a ela no gráfico. Já a função `ts.plot()` permite exatamente concatermos as duas séries, para que cada uma possa ter um tipo específico de linha.
+
+```{r}
+# Previsão resíduos
+residuos.prev <- predict(galinha.arma, n.ahead = 4)
+
+galinha.prev <- ts(c(BasePog[135,2], galinha.det + residuos.prev$pred), 
+                   start = end(BasePog),
+                   frequency = 4)
+
+# Gráfico das séries concatenadas
+ts.plot(cbind(BasePog[,2], galinha.prev), lty = c(1,3))
+```
+
+## Referências
+
+
+
+## Exercícios
+
+**1.** Seja $S$ a soma de uma Progressão Geométrica infinita com razão $a < 1$, tal que $S = 1 + a + a^2 + a^3 + \cdots$. Faça a subtração $S - a * S$ e mostre que podemos escrever essa soma  na forma $S = \frac{1}{1-a}$.
+
+**2.** Sobre as **funções de autocorrelação** dos modelos ARMA
+
+  a. Mostre, a partir do cálculo da autocorrelação para dois e três períodos, que a *FAC* de um processo *AR* apresenta um decaimento exponencial.
+
+  b. Você se lembra como obtemos o coeficiente dos mínimos quadrados? Compare a maneira como obtivemos $\rho_1$ e o resultado da estimação que fizemos logo na sequência.
+  
+  c. Mostre, a partir de um modelo *MA(1)*, porque a **FAC** será truncada a partir da autocorrelação de segunda ordem.
+  
+**3.** O pacote `forecasts` permite fazermos previsões de uma forma mais direta que aquela feita em aula.
+
+  a. Use a função `auto.arima()` para criar um modelo para a série de Ovos em `BasePog`, ao invés de construir um termo determinístico independente. Basta indicar um número máximo de defasagens para os componentes ARMA, além de definir a presença de um elemento sazonal: `sazonal = T`.
+  
+  b. Agora tome o modelo do item anterior como argumento da função `forcasts()` para fazer uma previsão 4 períodos a frente. Será preciso indicar o número de períodos a serem previstos  no argumento `h =`, assim como o nível de confiança para a previsão dos intervalos no argumento `level =`.
+  
+**4.** É possível obtermos o desvio padrão da previsão de resíduos para o modelo arma no objeto gerado pela função `predict()`. Vamos utilizar isso para acrescentar um intervalo de confiança para nossa previsão. Intervalos de confiança são construídos, por exemplo para um nível de significância de 95% multiplicando o desvio padrão pela estatística t associada ao nível de signficância de 95%, igual a 1.96. 
+
+$$ IC_{95\%} : (prev + 1.96* \hat{\sigma}, \ prev - 1.96* \hat{\sigma}) $$
+
+  a. Utilize esse desvio em `residuos.prev$se` para acrescentar em seu gráfico um intervalo de confiança com relação aos termos aleatórios. Para isso serão precisas duas séries, uma considerando a soma dos desvios e outra a subtração à série `galinha.prev` (lembre-se de excluir a primeira observação, referente ao 3T2020). Dica: a função `unclass()` será útil na soma.
+  
+  b. Agora utilize da função `lines()` para incluir esse intervalo ao gráfico. Note que a determinação dos pontos no eixo x pode ser feita da seguinte forma: `seq(2020.75, 2021.5, 0.25)`. Utilize `col = "red"` e `lty = 3`.
+  
+## Notas
+
+[^1]: Usualmente diz-se que as raízes do polinômio característico devem estar *fora do círculo unitário*, pois considera-se a possibilidade de raízes imaginárias, nas quais analisamos apenas a parte real e, ainda assim, elas devem estar fora do círculo unitário do *plano de Argand-Gauss*, ou *plano complexo*.
