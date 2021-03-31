@@ -1,0 +1,382 @@
+---
+title: "Aula 10"
+author: "Matias Rebello Cardomingo"
+output: html_document
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: center
+}
+
+</style>
+
+```{r klippy, echo=FALSE, include=TRUE}
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+```
+
+## Dados e mais dados
+
+Nessa última aula vamos olhar algumas bases de dados disponíveis no **R** de fácil acesso. Para trabalhar com elas vamos utilizar um conjunto de pacotes bastante comum para a *ciência de dados* em **R**. Trata-se do [*universo tidy*](https://www.tidyverse.org/), disponível em um único pacote:
+
+```{r, eval=FALSE}
+install.packages("tidyverse")
+```
+
+Talvez você se lembre que na Aula 4 nós apresentamos a ideia de uma base de dados *tidy*, ou seja, uma base de dados organizada de uma forma que facilita o manuseio para estudos de ciência de dados. Pois bem, essa noção é apresentada por @Wickham2017 e os vários pacotes que integram o *universo tidy* servem exatamente para facilitar a transformação[^1] de qualquer base de dados, em uma base *tidy*. Existem vários cursos abertos em que é possível trabalhar com esses pacotes[^2], na aula de hoje vamos lidar com algumas poucas funções desse universo, apenas em caráter introdutório. Também trabalharemos com a produção de gráficos a partir desse universo, utilizando a função `ggplot()`, ao invés das funções do pacote básico que usamos até aqui. Como de costume, vamos iniciar solicitando que o **R** acione o pacote `tidyverse`.
+
+```{r}
+library(tidyverse)
+```
+
+Um lado positivo desses pacotes é a constante atualização e uma gramática por vezes mais fácil do que aquela disponibilizada pelas funções do pacote base. De toda forma, para podermos conhecer um pouco melhor essas funções, vamos iniciar a temporada de novas bases de dados que temos reservada para hoje. A primeira delas será a base disponibilizada pelo Banco Mundial através do pacote `WDI` (*World Development Indicators*), que conta com um breve tutorial nesse [site](https://vincentarelbundock.github.io/WDI/), além de sua [documentação](https://cran.r-project.org/web/packages/WDI/WDI.pdf) no CRAN.
+
+### Dados do Banco Mundial
+
+```{r, eval=FALSE}
+install.packages("WDI")
+```
+
+Conforme podemos ver em sua documentação, dentre as variáveis disponibilizadas pelo pacote encontram-se os índices referentes ao desenvolvimento de vários países (*WDI*), mas também outras pesquisas produzidas pelo banco, como o Índice de Capital Humano, Estatísticas Internacionais de Dívida e a pesquisa Doing Business, constantemente evocada como manifestação de nosso *Custo Brasil*.
+
+```{r}
+library(WDI)
+```
+
+Uma maneira de buscar quais as informações disponíveis nessa base de dados gigantesca é buscarmos um termo de interesse. Vamos, por exemplo, fazer uma busca sobre as variáveis disponíveis que tratam de emprego (em inglês, *employment*) através da função `WDIsearch()`. Para vizualizarmos as diferenças da maneira de funcionar do mundo *tidy* vamos criar uma base de dados da classe `tibble` que contenha todas as variáveis dessa temática.
+
+```{r}
+emprego <- tibble(WDIsearch(string = "employment"))
+```
+
+Repare que ao imprimirmos `emprego` ele já apresenta novas características. Em primeiro lugar, ao apenas chamarmos o objeto ele não é impresso inteiro, apenas suas 10 primeiras linhas, parecido com o uso da função `head()`. Em segundo lugar você pode notar que ele nos informa a dimensão do objeto logo no início, indicando o número de linhas e colunas. Nesse caso em particular, também é interessante repararmos que ele criou para cada indicador uma linha única que apresenta, para além do código do indicador, o nome. Nos exercícios você irá explorar um pouco mais essa classe de objetos.
+
+Agora vamos escolher a variável *razão de desemprego feminino para desemprego masculino entre jovens* (com o nome *Ratio of female to male youth unemployment rate (%) (national estimate)*), dada pelo código `"SL.UEM.1524.FM.NE.ZS"`. Para baixarmos esses dados, basta informarmos o código no argumento `indicator =` da função `WDI()`.
+
+```{r}
+desem.fem <- WDI(indicator = "SL.UEM.1524.FM.NE.ZS", start = "2000")
+
+head(desem.fem)
+```
+
+Para facilitar nosso trabalho vamos renomear a variável de interesse através da função `rename()` do pacote `dyplr`, um dos mais utilizados nessa fase inicial de ajustes. Repare que aqui há uma facilidade não ser necessário selecionarmos dentro do vetor de nomes a variável que queremos ajustar, basta indicar o novo nome `desem.fem` e o antigo `SL.UEM.1524.FM.NE.ZS`.
+
+```{r}
+desem.fem <- rename(desem.fem, razao.desem = SL.UEM.1524.FM.NE.ZS)
+```
+
+Agora vamos filtrar nossos dados para restar apenas com as observações não faltantes através da função `filter()` (também do `dyplr`), ao invés da nossa velha conhecida `subset()`. Nesse caso, são funções que operam exatamente da mesma forma.
+
+```{r}
+desem.fem <- filter(desem.fem, !is.na(razao.desem))
+```
+
+Por fim, podemos obter a média dessa variável no século XXI para cada um dos países (ou grupos de países) utilizando duas funções: primeiro agrupamos os países através da `group_by()` e na sequência obtemos a razão média (`razao.med`) do desemprego entre gêneros através da função `summarise()`. Vamos armazenar esse resultado em um objeto `razao.med` para conseguirmos analisar os dados finais.
+
+```{r}
+razao.med <- summarise(group_by(desem.fem, country), razao.med = mean(razao.desem))
+
+summary(razao.med$razao.med)
+```
+
+Como podemos ver, para metade das regiões/países analisados o desemprego entre as mulheres jovens é 13% superior ao dos homens, enquanto a média indica um desemprego mais elevado na casa dos 32%. 
+
+<div class = "bloco">
+
+<div class = "center">
+Da direita para a esquerda, ou da esquerda para a direita: **pipe**
+</div>
+
+Uma das ferramentas mais úteis do *universo tidy* consiste no chamado **pipe** (cachimbo ou tubo), que permite escrevermos as funções na mesma maneira em que lemos normalmente: da esquerda para a direita. Ou seja, ao invés de ser necessário decifrarmos as funções mais internas descritas em um argumento, é possível aplicarmos cada função sobre um ojbeto de forma gradual. 
+
+Existem alguns tipos de **pipes**, mas o mais utilizado é justamente esse que leva o elemento mais à esquerda como argumento da função mais à direita. A tradução como cachimbo talvez seja menos intuitiva do que como tubo, em que algo é levado para um próximo lugar através de um objeto. Contudo, traduzir como cachimbo é mais importante para entender o nome do pacote: `magrittr`, em referência ao quadro *"Isso não é um cachimbo!"* (*"Cesi n'est pas une pipe!"*) do pintor René Magritte. Esse pacote, apesar de não estar descrito na relação de pacotes quando acionamos o `tidyverse` também é carregado conjuntamente e basta buscar a ajuda dele para ver a referência.
+</div>
+
+Nós podemos então reescrever `razao.med` utilizando o **pipe** da seguinte forma:
+
+```{r}
+razao.med <- desem.fem %>%
+  group_by(country) %>%
+  summarise(razao.med = mean(razao.desem))
+```
+
+Há inúmeras outras bases de dados disponíveis através do pacote `WDI`, basta buscar as palavras que descrevem a pesquisa que você quer fazer, por exemplo `"gpd"` (PIB), `"education"` (educação), `"health" (saúde), entre vários outros.
+
+### Outros organismos multilaterais
+
+Outras duas base de dados de organismos multilaterais são da *Organização para Cooperação e Desenvolvimento Econômico* (OCDE) e do *Fundo Monetário Internacional* (FMI). Os pacotes para acessar o *API* de cada um deles são instalados abaixo, respectivamente. 
+
+```{r, eval=FALSE}
+install.packages("OECD") 
+install.packages("imfr")
+```
+
+Novamente são pacotes voltados para disponibilizar o acesso fácil aos dados produzidos por essas instituições. No caso da [OCDE](https://cran.r-project.org/web/packages/OECD/OECD.pdf) (link para o [GitHub](https://github.com/expersso/OECD)) é possível acessar as tabelas disponíveis através da função `get_datasets()`. A visualização dessas tabelas também pode ser feito pelo próprio [site](https://stats.oecd.org/) da instituição. 
+
+```{r}
+library(OECD)
+
+bases.ocde <- get_datasets()
+```
+
+Apesar de ser bastante útil para fazer comparações internacionais, nem sempre as bases da OCDE incluem o Brasil, como é o caso nas informações sobre dívida dos governos centrais fornecida pela base `"GOV_DEBT"`. Vamos usar essa base, apesar dela ter sido descontinuada em 2010, assim podemos pelo menos conhecer a maneira de importar esses dados. Para baixar as informações basta utilizarmos da função `get_dataset()`, a única diferença entre elas é o fato dessa estar no singular, por isso tome cuidado na hora de escrever ou aceitar a indicação automática do **R**. 
+
+```{r}
+divida <- get_dataset("GOV_DEBT")
+```
+
+Como você pode ver, as variáveis possuem alguns códigos que não temos como decifrar apenas através da própria base. Por isso, podemos utilizar a função `get_data_structure()` para compreender melhor as informações que obtivemos.
+
+```{r}
+get_data_structure("GOV_DEBT")
+```
+
+Nesse caso os países são indicados pelo código ISO de três dígitos (na coluna `COU`), sempre que você quiser consultar, pode abrir nessa [página](https://pt.wikipedia.org/wiki/ISO_3166-1_alfa-3). O código do Brasil é "BRA", ou "BR" no caso de apenas dois dígitos, e ele não está na lista. A partir da descrição desses dados, podemos, por exemplo, identificar a participação de cada governo no total da dívida pública dos países da OCDE a cada ano. 
+
+Queremos obter, ao final, duas variáveis: uma que represente o valor da dívida de todos os países no ano e outra que compute a participação percentual da dívida no total. Para isso vamos começar a seleção daquilo que será utilizado, dada a descrição da base feita anteriormente:
+
+  * `DTYP == "AMT"` - Montante do estoque total
+  
+  * `UNIT == "USD"` - Valor em milhões de US$
+  
+  * `DVAR == 3` - Dívida do governo central
+  
+Na sequência será necessário eliminar as observações referentes ao total da União Europeia (`"EU15"`) e ao total da OCDE (`"OTO"`). Assim, vamos poder agrupar por ano usando novamente a função `group_by()`. Repare que uma nova sentença condicional pode ser adicionada à função `filter()` apenas como um novo argumento.
+
+```{r}
+divida <- divida %>% 
+  filter(DTYP == "AMT",
+  UNIT == "USD",
+  DVAR == "3",
+  !(COU %in% c("EU15", "OTO"))) %>% 
+  group_by(obsTime)
+```
+
+Agora nós podemos usar a função `mutate()` para criar duas novas variáveis, uma primeira responsável por somar todas as dívidas (`div.tot`) e outra por representar a participação de cada país (`part.div`). Para essa última vamos já utilizar a função `round()` a fim de padronizar a maneira como os valores serão escritos. 
+
+```{r}
+divida <- divida %>% mutate(div.tot = sum(obsValue),
+                            part.div = round(obsValue/div.tot, digits = 4))
+```
+
+Agora podemos olhar para o ano de 2010 e entender de que maneira cada país da OCDE contribuiu para o montante total da dívida acumulada pelos países da OCDE. Para podermos visualizar melhor, vamos utilizar da função `arrange()` que permite ordenarmos as observações. Contudo, para que ela nos mostre na ordem decrescente é preciso combiná-la com a função `desc()`, ambas do pacote `dyplr`.
+
+```{r}
+divida[,c("COU", "obsTime", "part.div")] %>% filter(obsTime == "2010") %>% arrange(desc(part.div))
+```
+
+Como podemos ver, a participação dos Estados Unidos no total da dívida acumulada pelos países da OCDE no ano de 2010 superava os 40%, enquanto os países mais próximos a ele tinham uma dívida pelo menos quatro vezes menor. A facilidade de importação desses dados demonstra a utilidade desse pacote, sendo que as informações para *contas nacionais*, por exemplo, estão disponíveis inclusive para o Brasil, como você verá nos exercícios. Também vale notar que as bases dos relatórios *Economic Outlook* estão disponíveis, como indica nossa lista em `bases.ocde`, contudo os arquivos são bastante pesados e exigem muito tempo para realizar o download.
+
+Agora vamos explorar os dados disponibilizados pelo FMI através do pacote `imfr`, que também possui sua documentação do [CRAN](https://cran.r-project.org/web/packages/imfr/imfr.pdf) e [GitHub](https://github.com/christophergandrud/imfr) de fácil acesso. Nesse caso, a função para vermos a lista das bases disponíveis pode ser acessada pela função `imf_ids()`.
+
+```{r, message=F, warning=FALSE}
+library(imfr)
+
+bases.fmi <- imf_ids()
+```
+
+A partir dessa lista, vamos trabalhar com a base de dados das Estatísticas Financeiras Internacionais (*International Financial Statistics - IFS*)[^3]. Para conseguirmos entender melhor as informações disponíveis é preciso passar por duas etapas intermediárias em que obtemos uma descrição mais detalhada da base. Em primeiro lugar nós obtemos o `imf_codelist()`, que nos indica quais são as variáveis que compõem a base sob análise. 
+
+```{r, message=F, warning=FALSE}
+imf_codelist("IFS")
+```
+
+Agora sabemos que o código `"CL_INDICATOR_IFS"` refere-se aos diferentes indicadores, então podemos buscar quais são as descrições desses indicadores disponíveis através da função `imf_codes()`.
+
+```{r}
+IFS.cod <- imf_codes("CL_INDICATOR_IFS")
+```
+
+De todos os indicadores disponíveis vamos utilizar o componente do gasto do Governo para o governo geral e empresas públicas, sob a rubrica de `NCGG_SA_XDC`[^4]. Para finalmente conseguirmos baixar essas informações será preciso infomar a base de dados (`database_id`) e o indicador desejado (`indicator`). O padrão da função é baixar os dados a partir do ano 2000 até o mais recente, nesse caso em valores nominais da moeda doméstica.
+
+```{r}
+fmi.gov.geral <- imf_data(database_id = "IFS",
+                          indicator = "NCGG_XDC",
+                          country = c("BR", "MX"))
+```
+
+Agora vamos transfomar cada uma das séries em uma proporção do valor inicial, para acompanhar a evolução delas ao longo do tempo. Para isso, será preciso dividir todos os valores pelo gasto no ano 2000, isso é possível de ser feito utilizando a mesma *seleção* que fazíamos através do comando `[`. A diferença aqui será não precisarmos indicar a qual objeto estamos nos referindo para fazer a seleção, bastará indicar que vamos utilizar o gasto no menor ano da base, nesse caso, 2000. 
+
+```{r}
+fmi.gov.geral <- fmi.gov.geral %>%
+  group_by(iso2c) %>%
+  mutate(prop = NCGG_XDC/NCGG_XDC[year == min(year)])
+```
+
+Com esses dados podemos criar um gráfico que represente a evolução desse componente do PIB ao longo do tempo (sempre em termos nominais). Mas para criar esse gráfico utilizaremos o comando `ggplot()`, que possui sua própria gramática. Em primeiro lugar é preciso fornecermos na função `aes()` quais serão os dados de cada um dos eixos. Na sequência podemos indicar qual o tipo de gráfico que será gerado (linhas, pontos, histograma e etc) indicando através das funções `geom_*tipo*`. Repare que ao passarmos de uma função para outra no mundo do `ggplot()` devemos indicar com um `+`, que funciona de forma semelhante ao **pipe** Nesse caso vamos produzir um gráfico para Brasil e México, indicando cada país através da cor:
+
+```{r}
+fmi.gov.geral %>%
+  ggplot(mapping = aes(x = year, y = prop, col = iso2c)) +
+  geom_point()
+```
+
+Também seria possível deixarmos cada um dos países em um gráfico diferente através da função `facet_wrap()`.
+
+```{r}
+fmi.gov.geral %>%
+  ggplot(mapping = aes(x = year, y = prop)) +
+  geom_point() + 
+  facet_wrap(~ iso2c)
+```
+
+Dada a natureza do dado e o fato de estarmos trabalhando com valores nominais, é pouco útil compararmos os valores em si que obtivemos. O mais importante é termos essa breve introdução à essa ferramenta importante para obtenção de dados, além da grámatica do `ggplot`.
+
+### Informações financeiras
+
+Uma boa fonte para dados financeiros é o [pacote](https://cran.r-project.org/web/packages/quantmod/quantmod.pdf) `quantmod`. Nele podemos encontrar informações não só para o Brasil, mas também internacional. Esse pacote é bastante mais simples que os anteriores, na medida em que ele fornece ferramentas para analisar as próprias séries financeiras que é capaz de baixar. 
+
+```{r, eval=FALSE}
+install.packages("quantmod")
+```
+
+É possível, por exemplo, obtermos o comportamento da bolsa brasileira, através do índice Ibovespa (código `"^BVSP"`) e também o índice S&P500 (`"^GSPC"`), responsável por acompanhar 500 companhias americanas representativas do mercado considerando as duas principais bolsas (NYSE e Nasdaq).
+
+```{r, message=F, warning=FALSE}
+library(quantmod)
+```
+
+Para obter as séries basta informar o código de cada uma delas (bastante fácil de serem obtidos no Google), a fonte de busca (que será a ferramenta de finanças do Yahoo para a maior parte delas) e o período desejado. Vamos selecionar, então, para ambos os índices a partir de novembro de 2019 até fevereiro de 2021. 
+
+```{r, echo=FALSE}
+getSymbols("^BVSP", src = "yahoo", 
+           from = as.Date("2019-11-01"), to = as.Date("2021-02-28"))
+
+getSymbols("^GSPC", src = "yahoo", 
+           from = as.Date("2019-11-01"), to = as.Date("2021-02-28"))
+```
+Como você pode notar, não é preciso nem mesmo atribuirmos a função a um objeto, ela mesma gera utilizando o nome da série fornecida com uma classe de série de tempo. Cada um desses objetos carrega 6 séries distintas: abertura do pregão, fechamento, pico, mínimo, volume de vendas e um ajuste. Cada uma dessas séries pode ser analisada individualmente. Mas uma forma bastante simples de sentir-se em uma mesa de operações durante seus estudos é utilizar da função `chartSeries()`. 
+
+```{r}
+chartSeries(GSPC)
+```
+
+Nesse caso gráfico nos fornece a própria variação dentro do dia, além de indicar as perdas em laranja e os ganhos em verde. Uma versão mais simples desse gráfico pode ser obtida através da seguinte função:
+
+```{r}
+lineChart(BVSP, type = "c")
+```
+
+Nesse caso nós obtemos apenas uma linha para o fechamento do pregão, indicado no `type = "c"`, que representa a série `"close"` no objeto `BVSP`. 
+
+### Tesouro Direto
+
+Por fim, vamos olhar como funciona para obtermos dados sobre a dívida pública brasileira através do [pacote](https://cran.r-project.org/web/packages/GetTDData/GetTDData.pdf) `GetTDData`, ou *Get Tesouro Direto Data*. 
+
+```{r, eval=FALSE}
+install.packages("GetTDData")
+```
+
+Através desse pacote é possível obtermos informações para todos os títulos nacionais, descritos na tabela abaixo. Contudo, na aula de hoje vamos apenas analisar as informações referentes aos títulos de LTNs, que costumam servir para estudarmos a curva de juros.  
+
+<div class = "center">
+
+|Sigla | Título | Pré ou Pós |  Cupom|
+|:-----:|:-----:|:-----:| :-----:|
+|LTN | Letra do Tesouro Nacional | Pré | N |
+|NTN-F | Notas do Tesouro Nacional - Série F | Pré | S |
+|NTN-B Principal | Notas do Tesouro Nacional - Série B Principal | Pós - IPCA | N |
+|NTN-B | Notas do Tesouro Nacional - Série B | Pós - IPCA | S |
+|LFT | Letra Financeira do Tesouro | Pós - Selic | N |
+
+</div>
+
+```{r, message=FALSE}
+library(GetTDData)
+```
+
+O primeiro passo é obtermos as informações referentes a todos os contratos com LTNs, para isso o pacote irá baixar as informações direto do site do Tesouro Direto. Assim, é importante estabelecer onde você gostaria que esses arquivos (bastante grandes) fossem salvos através do estabelecimento de um diretório de trabalho com a função `setwd()`. Na sequência basta pedir para que os arquivos sejam baixados.
+
+```{r, message=FALSE, warning=FALSE}
+setwd("C:/Users/matia/OneDrive/Documentos/Economia")
+download.TD.data(asset.codes = 'LTN', )
+```
+
+Feito isso, podemos criar um objeto que vai armazenar essas informações com cada um dos títulos negociados até o dia da análise.
+
+```{r, render=FALSE, message=FALSE, warning=FALSE}
+LTN <- read.TD.files(asset.codes = 'LTN')
+```
+
+Como você pode notar, obtivemos um objeto bastante grande, com `r nrow(LTN)` linhas. Agora vamos obter curvas de juros para os últimos 4 trimestres e acompanhar a evolução do prêmio cobrado sobre o Tesouro brasileiro. Em primeiro lugar, note que temos cinco variáveis no objeto `LTN`, sendo uma delas a data de maturidade do título (`matur.date`) e outra a data de referência, ou emissão (`ref.date`). Vamos gerar uma variável que expressa o número de dias entre a data de emissão do título e sua data de vencimento (`matur.date - ref.date`), ou seja, o quão longo é o período até o recebimento do título. Por fim, vamos acrescentar uma variável mês que irá extrair, através da função `months()` qual o mês de cada uma das datas de referência.
+
+```{r}
+LTN <- LTN %>% 
+  filter(ref.date > "2020-06-03") %>%
+  mutate(termo = matur.date - ref.date,
+         mes = months(ref.date))
+```
+
+Agora vamos agrupar as obsevações por mês e termo, para obtermos uma média do juros cobrados (`yield.bid`) a cada mês de acordo com a distância até o vencimento do título. Na última etapa vamos filtrar para deixar apenas os trimestres de interesse.
+
+```{r}
+juros <- LTN %>% 
+  group_by(termo, mes) %>%
+  summarise(juros = mean(yield.bid, na.rm = T) * 100) %>%
+  filter(mes %in% c("março", "dezembro", "setembro", "junho")) 
+```
+
+Por fim, podemos usar a função `geom_smooth()` do `ggplot()` para gerar uma função de segundo grau que expresse a curva de juros para cada um desses períodos usando a função `poly()`. Repare, por fim, como as duas últimas partes desse conjunto de códigos é utilizada para definir as características da legenda. Primeiro estabelecemos que ela terá como título a palavra `"Mês"` e ajeitamos sua posição para ficar acima das categorias, na sequência estabelecemos que a legenda toda deve vir abaixo da figura. 
+
+```{r}
+juros %>%
+  ggplot(mapping = aes(x = termo, y = juros, col = mes)) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = F) +
+  guides(color = guide_legend(title = c("Mês"), title.position = "top", title.hjust = 0.5)) +
+  theme(legend.position = "bottom")
+```
+
+Aqui podemos notar como a curva de juros tem subido ao longo do tempo, mas o mês de março de 2021 se descolou por completo das demais curvas, indicando que a tempestade perfeita de mortes pela pandemia, recessão e crise fiscal cobrará um preço alto durante algum tempo. 
+
+### Exercícios
+
+  **1.** Vamos nos aprofundar um pouco na compreensão do `tibble` e aproximá-lo daquilo que já conhecemos.
+    
+  a. Usando a função `sloop::s3_dispatch()` é possível identificar que há um método próprio de impressão. Já com a função `class()` podemos notar que esse objeto é parente de um outro que já conhecemos.
+  
+  b. A partir dessas informações, o que você acredita que será o resultado de `class(unclass(emprego))`? E o que isso pode nos dizer sobre a diferença de fazermos `emprego[[1]][1,]`, para fazermos `emprego[1,]`.
+  
+  c. Quais outras informações o `tibble` fornece no caso em que agrupamos países como quando geramos `desemp.fem`?
+  
+  **2.** Utilize a base de dados `"QNA"` para obter as contas nacionais dos países integrantes da OCDE no pacote visto em aula. 
+  
+  a. Compare a formação bruta de capital fixo brasileira com dos demais países.
+  
+  b. Calcule a participação de cada país no total gasto pelos governos sob a rubrica de `"General government final consumption expenditure"` tal como fizemos para a participação da dívida.
+  
+  **3.** Quando usamos a função `filter()` para produzir o objeto `divida`, qual era o operador lógico que teríamos utilizado para indicar as duas condições? Reconstrua a mesma *seleção* que foi feita nesse trecho utilizando o comando `[` e a função `subset`.
+  
+  a. E se quiséssemos usar a função `order()` para realizar a mesma ordenação feita pela função `arrange()` na identificação da participação da dívida de cada país no total?
+  
+  **4.** Usando o pacote `quantmod` faça:
+  
+  a. Um gráfico representando o período de alta das ações a Game Stop (código `GME`) a partir de janeiro de 2021.
+  
+  b. Um novo gráfico que acompanhe as ações da Petrobrás (código `PETR4.SA`) durante o período de demissão de seu então presidente Roberto Castello Branco em fevereiro de 2021.
+
+### Referências
+
+### Notas
+
+[^1]: Usa-se bastante a expressão *data wrangle*, ou *brigar com os dados*, para descrever essa etapa do trabalho.
+
+[^2]: Aqui segue a recomendação de alguns deles:
+
+[^3]: Apesar do pacote nos indicar uma série de bases diferentes, poucas delas parecem apresentar um acesso funcional. Todavia, a base do *IFS* possui uma série de estatísticas interessantes que podem colaborar ao longo da pesquisa.
+
+[^4]: O título do indicador completo é dado por: *National Accounts, Expenditure, Gross Domestic Product, Final Consumption Expenditure, Public Sector (General Government and Public Corporations), General Government, Nominal, Domestic Currency*.
