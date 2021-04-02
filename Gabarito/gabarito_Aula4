@@ -1,0 +1,190 @@
+#EXERCICIOS
+#1
+
+install.packages("dynlm")
+library(dynlm)
+
+#buscando a base de dados do artigo
+
+lmtest::ChickEgg
+
+#transformando a base de dados em objeto da classe ts
+
+dados_fisher <- ts(lmtest::ChickEgg, 
+                   start = c(1930,1), 
+                   end = c(1983,1), 
+                   frequency = 1)
+
+# inspecionando a serie criada
+
+dados_fisher
+
+#queremos reproduzir com apenas um for os seguintes modelos
+#ou seja, 8 regressoes, 4 com galinhas como variavel dependente e pares iguais
+# de defasagens de galinhas e ovos (de 1 a 4). e, de forma similar, 4 regressoes
+#com ovos como variavel dependente e iguais defasagens.
+
+dynlm(dados_fisher[,1] ~ L(dados_fisher[,1],1)+L(dados_fisher[,2],1))
+dynlm(dados_fisher[,1] ~ L(dados_fisher[,1],1:2)+L(dados_fisher[,2],1:2))
+dynlm(dados_fisher[,1] ~ L(dados_fisher[,1],1:3)+L(dados_fisher[,2],1:3))
+dynlm(dados_fisher[,1] ~ L(dados_fisher[,1],1:4)+L(dados_fisher[,2],1:4))
+dynlm(dados_fisher[,2] ~ L(dados_fisher[,1],1)+L(dados_fisher[,2],1))
+dynlm(dados_fisher[,2] ~ L(dados_fisher[,1],1:2)+L(dados_fisher[,2],1:2))
+dynlm(dados_fisher[,2] ~ L(dados_fisher[,1],1:3)+L(dados_fisher[,2],1:3))
+dynlm(dados_fisher[,2] ~ L(dados_fisher[,1],1:4)+L(dados_fisher[,2],1:4))
+
+
+
+modelos <- data.frame()
+
+
+for(j in seq_along(1:2)){
+  
+  for(i in seq_along(1:4)){
+    
+    modelos1 <- dynlm(dados_fisher[,j] ~ 
+                        L(dados_fisher[,1],i:4)
+                      +L(dados_fisher[,2],i:4))
+    
+    
+    modelos <- append(modelos, modelos1$coefficients)
+    
+    
+  }
+}
+
+
+#como podemos observar, salvamos os coeficientes das 8 regressoes rodadas em um
+#unico data frame
+
+View(modelos)
+
+#Agora a partir de uma outra interpretacao do exercicio
+
+modelo_galinha1 <- dynlm(dados_fisher[,1] ~ L(dados_fisher[,1],1:4)+
+                           L(dados_fisher[,2],1:4))
+
+
+modelo_galinha2 <- dynlm(dados_fisher[,1] ~ L(dados_fisher[,1],1:4))
+
+modelo_ovo1 <- dynlm(dados_fisher[,2] ~ L(dados_fisher[,2],1:4)+
+                       L(dados_fisher[,1],1:4))
+
+
+modelo_ovo2 <- dynlm(dados_fisher[,2] ~ L(dados_fisher[,2],1:4))
+  
+
+#inspecionando os dados
+
+#obtivemos apenas as regressoes com quatro defasagens para 
+#cada variavel distinta
+
+
+modelo_galinha1
+modelo_galinha2
+
+modelo_ovo1
+modelo_ovo2
+
+#faremos agora o procedimento de checar se a regressÃ£o Ã© significante
+#a partir de um teste F
+
+summary(modelo_galinha1)
+summary(modelo_galinha2)
+
+summary(modelo_ovo1)
+summary(modelo_ovo2)
+
+#teste F de significancia de conjunto de variaveis adicionadas
+
+residuos_galinha1 <- modelo_galinha1$residuals
+residuos_galinha2 <- modelo_galinha2$residuals
+
+residuos_ovo1 <- modelo_ovo1$residuals
+residuos_ovo2 <- modelo_ovo2$residuals
+
+#numerador p/ galinhas
+
+F.num_galinhas <- (sum(residuos_galinha2^2)-sum(residuos_galinha1^2))/
+  (length(coef(modelo_galinha1))-length(coef(modelo_galinha2)))
+
+#denominador p/ galinhas
+F.den_galinhas <- (sum(residuos_galinha2^2))/
+  ((nrow(dados_fisher)-4)-length(coef(modelo_galinha2)))
+
+#teste F para galinhas
+
+F.num_galinhas/F.den_galinhas
+
+#numerador p/ ovos
+
+F.num_ovos <- (sum(residuos_ovo2^2)-sum(residuos_ovo1^2))/
+  (length(coef(modelo_ovo1))-length(coef(modelo_ovo2)))
+
+
+#denominador p/ ovos
+
+F.den_ovos <- (sum(residuos_ovo2^2))/
+  ((nrow(dados_fisher)-4)-length(coef(modelo_ovo2)))
+
+#teste F
+
+F.num_ovos/F.den_ovos
+
+
+#agora, faremos o teste granger a partir do
+
+dados_fisher
+
+lmtest::grangertest(dados_fisher[,2:1] ,order = 4)
+
+lmtest::grangertest(dados_fisher[,1:2] ,order = 4)
+
+# nesse caso temos um resultado diferente do resultado com dados brasileiros
+# ovos granger causam galinhas e a reciproca nao eh vdd
+
+
+
+
+#2
+
+
+
+
+dados_residuos <- cbind(residuos_galinha1,
+                        residuos_galinha2,
+                        residuos_ovo1, 
+                        residuos_ovo2)
+
+
+dados_residuos
+colnames(dados_residuos)
+
+par(mfrow = c(1,1))
+
+for (k in seq_along(colnames(dados_residuos))){
+ 
+  
+  k <- dados_residuos[,k]
+  
+  nome <- colnames(k)
+  png(filename = paste0(nome,"_arquivo.png"))
+  
+  hist(k,
+       main = colnames(k)[1],
+       xlab = "Valor",
+       ylab = "Densidade",
+       freq = F)
+  
+  
+  lines(x = seq(min(k), max(k), length.out = length(k)),
+        y = dnorm(seq(min(k), max(k), length.out = length(k)), sd = sd(k)),
+        col = "red")
+  dev.off()
+  
+        
+}
+
+getwd()
+
+#faltou resolver a questao do titulo
