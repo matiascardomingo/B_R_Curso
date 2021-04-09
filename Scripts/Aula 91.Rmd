@@ -1,0 +1,322 @@
+---
+title: "Aula 9"
+author: "Matias Rebello Cardomingo"
+date: "27 de março de 2021"
+output: html_document
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+div.centralizado {
+  margin-right: 200px;
+  margin-left: 200px;
+}
+
+div.center {
+  text-align: centera 
+}
+
+</style>
+
+## Utilizar as informações longitudinais da PNADc
+
+Nessa aula nós vamos utilizar o fato da  *Pesquisa Nacional por Amostra de Domicílios Contínua* (PNADc) analisar as mesmas unidades de observação ao longo do tempo. Isso consiste na característica **longitudinal** da pesquisa, aquilo que muitas vezes em econometria chamamos por **painel**. Há dois textos importantes que tratam da metodologia de identificação de indivíduos, um de @Teixeira2019 tratando especificamente da PNADc e disponível nesse [link](http://repositorio.ipea.gov.br/bitstream/11058/10275/5/bmt_67_nt_pesos_longitudinais.pdf), e outro de @Ribas2008, tratando da antiga *Pesquisa Mensal de Emprego* (PME), encerrada em março de 2016, também disponível [online](https://www.ipea.gov.br/portal/images/stories/PDFs/TDs/td_1348.pdf). Na aula vamos explicar brevemente o método sugerido pelos autores, mas não faremos a reponderação de pesos sugerida por @Teixeira2019, vamos apenas trabalhar com os pesos definidos na própria PNADc. 
+
+Após identificarmos os mesmos indivíduos, vamos proceder com uma análise utilizando método de *método de score de propensão* (ou *propensity score method*) a fim de avaliar o impacto na renda sofrido ao longo da pandemia do coronavírus pelas empregadas domésticas em comparação com as demais mulheres empregadas no setor privado. O objetivo dessa análise é mais voltado para uma primeira aproximação com a ideia de *matching* do que propriamente uma aplicação do método. Afinal, o ideal seria abordarmos um programa ou tratamento específico, como mudanças de legislação, treinamentos e etc, ao invés de tomarmos uma ocupação como nossa variável de seleção entre *tratados* e *controle*. Ainda assim, nosso objetivo será apresentarmos uma primeira aproximação ao conteúdo, assim como explorarmos um pouco mais a própria PNADc disponibilizada pelo pacote `PNADcIBGE` que iniciamos na última aula. O pacote utilizado para realizar o *PSM* deve ser instalado com o comando abaixo e nesse [link](https://cran.r-project.org/web/packages/MatchIt/vignettes/MatchIt.html) tem uma bom tutorial para ele (em inglês).
+
+```{r, eval=FALSE}
+install.packages("MatchIt")
+```
+
+A importância dessas pesquisas está no fato delas permitirem acompanhar segmentos representativos da populção ao longo tempo. Contudo, esse método representa desafios importantes, pois quando uma unidade de observação deixa de responder uma das rodadas do questionário ocorre um desbalanceamento da amostra e dos pesos atribuídos a cada família, e é por isso que torna-se necessário reponderar os pesos de cada observação.
+
+A construção da amostra segue o *esquema de rotação 1-2(5)*, no qual o domicílio entrevistado em um dado mês é entrevistado novamente apenas no próximo trimestre, ficando dois meses fora da amostra. Após cinco ciclos de entrevistas o domicílio é retirado da amostra @IBGE2014. É importante notar que trata-se de uma *pesquisa longitudinal de* **domicílios**, o que significa que mesmo no caso dos moradores se mudarem de casa a entrevista continuará ocorrendo naquela residência, mas com novas pessoas. Assim, para obtermos uma *pesquisa longitudinal de moradores* é preciso identificarmos os indivíduos dentro de cada domicílio e apenas então fazermos o acompanhamento ao longo do tempo. @Teixeira2019 apresentam como critério de identificação dos indivíduos a igualdade nas variáveis, partindo da identificação mais completa para a mais simples:
+
+  * número de ordem, posição no domicílio, sexo e data de nascimento
+  * número de ordem, sexo e data de nascimento
+  * posição no domicílio, sexo e data de nascimento
+  * sexo e data de nascimento
+
+No nosso caso vamos utilizar apenas as duas últimas pesquisas da PNADc para 2019 e 2020. Através delas vamos identificar quais são os indivíduos que fizeram a pesquisa pela primeira vez em 2019 e a última ao final de 2020. Nossa identificação de indivíduos será feita utilizando o critério mais rigoroso apresentado pelos autores, sendo um dos exercícios reproduzir nossos resultados para critérios mais elásticos. Em primeiro lugar, vamos acionar o pacote para obtermos dados da PNADc.
+
+```{r, message=FALSE}
+library(PNADcIBGE)
+```
+
+E agora vamos já baixar os dados referentes as duas pesquisas que serão utilizadas na aula. Note que em primeiro lugar nós definimos o conjunto de variáveis que gostaremos de obter em ambas as coletas. A maior parte delas é, na verdade, utilizada apenas na identificação dos indivíduos, enquanto as três últimas consisitirão em nossa análise a respeito da situação das empregadas domésticas. 
+
+```{r, message=FALSE, warning=FALSE}
+variaveis <- c("V1008", # Número de seleção domicílio
+               "V2001", # Número de pessoas no domicílio
+               "V2010", # Raça
+               "V1016", # Número da entrevista no domicílio
+               "V2003", # Número de ordem (dentre os demais entrevistados do domicílio)
+               "V2005", # Condição no domicílio
+               "V2007", # Sexo
+               "V2008", # Dia do nascimento
+               "V20081", # Mês do nascimento
+               "V20082", # Ano do nascimento
+               "V2009", # Idade
+               "VD2002", # Cônjuge ou companheiro(a)
+               "VD3006", # Grupos de anos de estudo: 0-1; 1-4 ; 5-8; 9-11; 12-15
+               "VD4002", # Condição de ocupação
+               "VD4008", # Posição na ocupação no trabalho principal
+               "VD4017") # Rendimento mensal efetivo do trabalho principal 
+
+pnad1 <- get_pnadc(year = 2019,
+                   quarter = 4,
+                   defyear = 2020,
+                   defperiod = 4,
+                   deflator = T, 
+                   vars = variaveis) 
+
+pnad2 <- get_pnadc(year = 2020,
+                   quarter = 4,
+                   defyear = 2020,
+                   defperiod = 4,
+                   deflator = T, 
+                   vars = variaveis) 
+```
+
+Agora que já temos nossas variáveis, vamos criar uma variável `Id` que contenha uma chave única para identificar cada um dos indivíduos. Repare que essa chave será formada por uma variável do tipo `character`, contendo todas as informações relevantes para identificação. Você também irá notar que utilizamos  mais variáveis do que as quatro características destacadas pelos autores. Isso se deve ao fato de que esses quatro atributos devem ser buscados dentre os indivíduos de um mesmo domicílio, logo, é preciso em primeiro lugar identificar o próprio domicílio em si, o que é feito com as duas primeiras variáveis que nos trazem o número da **UPA** e o **número de seleção do domicílio**, ambos estão um pouco melhor explicados no quadro abaixo.
+
+<div class = "bloco">
+<div class = "center">
+**Pesquisas domiciliares - IBGE**
+</div>
+
+As pesquisas domiciliares do IBGE compõem o [*Sistema Integrado de Pesquisas Domiciliares (SIPD)*](https://biblioteca.ibge.gov.br/visualizacao/livros/liv101435.pdf). Hoje esse Sistema abriga duas outras pesquisas além da *PNAD*: a *Pesquisa de Oraçamentos Familiares (POF)* e a *Pesquisa Nacional de Saúde (PNS)*. Essas três são formuladas a partir de uma única *amostra mestra*, composta por *unidades de área* construídas a partir do Censo Demográfico e, por isso, também chamadas por *setores censitários*. Cada um desses *setores* da *amostra mestra* constitui, por sua vez, uma *unidade primária de amostragem (UPA)* no planejamento amostral de cada pesquisa do SIPD, exatamente nossa primeira variável utilizada para construir `Id`. A composição da UPA, contudo, exige um mínimo de 60 domicílios particulares permanentes, registrados no *Cadastro Nacional de Endereços para Fins Estatísticos (CNEFE)*. Nos casos em que esse mínimo não é atendido, então os setores censitários são agrupados por subdistrito até que se atinja o número mínimo.
+
+Cada uma das pesquisas do SIPD utiliza um número diferente de UPAs: enquanto a POF baseia-se em 40% delas, a PNADc utiliza a totalidade. Para que não haja sobrecarga dos domicílios entrevistados, cada residência pode estar incluída em apenas uma pesquisa. No caso da PNAD são utilizados 14 domicílios da UPA, sendo que a cada trimestre são entrevistados 211 mil domicílios em 15 mil UPAs.
+
+</div>
+
+```{r}
+# Indivíduo
+pnad1$variables$Id <- paste(pnad1$variables$UPA, # Unidade Primária de Amostragem 
+                            pnad1$variables$V1008, # Número de seleção domicílio
+                            pnad1$variables$V2003, # Número de ordem
+                            as.numeric(pnad1$variables$V2007), # Sexo
+                            as.numeric(pnad1$variables$V2010), # Raça
+                            " - ", 
+                            pnad1$variables$V2008, "/", # Dia do nascimento
+                            pnad1$variables$V20081, "/", # Mês ||
+                            pnad1$variables$V20082) # Ano ||
+  
+pnad2$variables$Id <- paste(pnad2$variables$UPA, 
+                            pnad2$variables$V1008,
+                            pnad2$variables$V2003, 
+                            as.numeric(pnad2$variables$V2007), 
+                            as.numeric(pnad2$variables$V2010),
+                            " - ", 
+                            pnad2$variables$V2008, "/", 
+                            pnad2$variables$V20081, "/", 
+                            pnad2$variables$V20082)
+```
+
+Antes de partirmos para a identificação em si dos indivíduos que estão presentes em cada uma das pesquisas, vamos entender um pouco melhor como podemos compreender o funcionamento da PNADc. Por exemplo, agora que sabemos o esquema de rotação dos domícilios, vamos entender qual o total de domicílios que fizeram a primeira entrevista no último trimestre de 2019. Para isso podemos utilizar a variável `V1016`: número da entrevista no domicílio[^1]. Note que ela apresenta valores de 1 até 5, representando o ciclo de entrevistas de cada domicílio. 
+
+```{r}
+unique(pnad1$variables$V1016)
+
+sum(pnad1$variables$V1016 == 1)
+```
+
+Ou seja, temos 109873 pessoas que fizeram a primeira entrevista no ciclo de rotação no último trimestre de 2019, mas agora vamos ver quantas pessoas no total da população essas entrevistas representam. Para isso, é preciso manusearmos os pesos das observações, como vimos aula passada eles são formados a partir da conta `1/prob`, sendo `prob` o vetor de probabilidades associado a cada observação. Nosso primeiro passo será criar o vetor `prob` exatamente igual ao vetor de probabilidades associado à PNADc de 2019. Na sequência, para restringirmos os pesos às pessoas da primeira entrevista, será preciso atribuir o valor infinito aos domicílios que já foram entrevistados pelo menos uma vez. Na sequência faremos a soma dos pesos para identificar quanto da população essas 109873 observações representam. 
+
+```{r}
+prob <- pnad1$prob
+
+prob[pnad1$variables$V1016 > 1] <- Inf
+
+sum(1/prob)
+```
+
+Para entendermos o quanto essas 42602254 diferem do total vamos obter o intervalo de confiança de duas estatísticas descritivas da subamostra e da população total: a renda média e a proporção de trabalhadores domésticoss. Para isso vamos utilizar do pacote `survey` novamente. 
+
+```{r, message=FALSE, warning=FALSE}
+library(survey)
+
+# Renda média
+confint(svymean(~ VD4017, pnad1, na.rm = T)) 
+confint(svymean(~ VD4017, subset(pnad1, V1016 == 1), na.rm = T))
+
+# Participação de trabalhdores domésticos
+confint(svymean(~ VD4008 == "Trabalhador doméstico", pnad1, na.rm = T))
+confint(svymean(~ VD4008 == "Trabalhador doméstico", subset(pnad1, V1016 == 1), na.rm = T))
+```
+
+Os intervalos indicam nos dois casos que as estatísticas descritivas da subamostra incluem os valores populacionais, porém em um intervalo bastante mais alargado, exatamente em decorrência do tamanho reduzido da amostra. Também é interessante notarmos que o ciclo de entrevistas é formado a partir de todas as Unidades da Federação, assim como cada ciclo inclui um número relativamente próximo de *unidades primárias de amostragem*. Para identificar essas semelhanças vamos executar o outro ciclo, nosso velho conhecido `for`, no qual vamos identificar quantas (`length()`) observações distintas (`unique()`) de UFs e UPAs temos para cada ciclo de entrevistas.
+
+```{r}
+# Unidades da Federação para cada ciclo de entrevista
+for (ent in 1:5) print(length(unique(pnad1$variables$UF[pnad1$variables$V1016 == ent])))
+
+# Número de UPAs por ciclo de entrevista
+for (ent in 1:5) print(length(unique(pnad1$variables$UPA[pnad1$variables$V1016 == ent])))
+```
+
+Feitas essas observações, vamos agora entender quantas pessoas que realizaram a primeira entrevista no último trimestre de 2019 nós de fato conseguimos identificar na PNADc de 2020. Para isso usaremos o operador `%in%`, que nos indica quais dos elementos do primeiro vetor estão presentes no conjunto dos elementos do segundo. Abaixo um pequeno exemplo:
+
+```{r}
+c("a", "b", "2", "c", 10) %in% letters
+```
+
+Isso servirá para entendermos quais das chaves de identificação da primeira pesquisa encontram correspondência na segunda. Para isso vamos criar um vetor de identificações (`Id`) apenas das pessoas que fizeram a primeira entrevista em 2019 e na sequência verificar quantas delas são identificadas em 2020.
+
+```{r}
+prim2019 <- pnad1$variables$Id[pnad1$variables$V1016 == 1]
+
+sum(prim2019 %in% pnad2$variables$Id[pnad2$variables$V1016 == 5])
+```
+
+Portanto, temos que um pouco mais de 47% das pessoas que fizeram a primeira entrevista em 2019 podem ser identificadas posteriormente. Uma verificação interessante que podemos fazer é verificar o número da entrevista das pessoas que pudemos localizar nas duas pesquisas. No esquema *1-2(5)* nós deveríamos esperar que as pessoas que fizeram a primeira entrevista no último trimestre de 2019 estejam em sua quinta (e última) entrevista no último trimestre de 2020. Isso pode ser verificado no ciclo `for` adiante, em que executamos o mesmo comando anterior, mas para todas as possibilidades de número da entrevista.
+
+```{r}
+for (entrevista in 1:5) {
+  
+  print(paste("Entrevista nº", entrevista, "tem",
+              sum(prim2019 %in% pnad2$variables$Id[pnad2$variables$V1016 == entrevista]),
+              "indivíduos identificados"))
+  
+}
+```
+
+Antes de fazermos a análise do impacto da pandemia através do pareamento, vamos adaptar nossas bases de dados para que elas contenham apenas as pessoas identificadas nas duas pesquisas, assim não vamos parear indivíduos que deixamos de observar posteriormente. Junto a isso, também vamos criar uma variável que nos identifique trabalhadoras domésticas.
+
+```{r}
+pnad1$variables$Domestica <- as.numeric(pnad1$variables$VD4008 == "Trabalhador doméstico")
+
+identificados <- pnad1$variables$Id %in% pnad2$variables$Id[pnad2$variables$V1016 == 5]
+
+dados.match <- pnad1$variables[identificados & !is.na(pnad1$variables$Domestica),]
+```
+
+
+## Pareamento
+
+Antes de apresentarmos os comandos, vamos discutir de forma breve os conceitos que fundamentam a noção de pareamento. Em primeiro lugar é preciso entender que o principal objetivo desse método está na construção de **contrafactuais**, ou seja, construirmos o que teria acontecido caso o *tratamento* sob análise não tivesse existido. Por exemplo, no nosso caso vamos buscar dentre as pessoas entrevistadas da nossa amostra aquela que é mais parecida com cada um dos trabalhadores domésticos, para que essas pessoas nos sirvam de indicação sobre o que teria acontecido com esses trabalhadores caso eles eles tivessem outra emprego no setor privado. 
+
+Na chamada notação de resultados potenciais indicamos a observação das pessoas tratadas e não tratadas por $Y^T_{t,T}$ e $Y_{t,T}$, respectivamente. Em que $t$ é o período (pré e pós tratamento, por exemplo, $0$ e $1$) e $T$ indica se a pessoa foi ou não tratada ($1$ em caso positivo e $0$ caso contrário), a redudância entre $T$ sobre-escrito e sub-escrito ficará evidente na sequência. Ou seja, $Y^T_{0,1}$ e $Y^T_{1,1}$ representam, no nosso caso, $Renda_{Q42019, Doms.}$ e $Renda_{Q42020, Doms.}$, enquanto $Y_{0,0}$ e $Y_{1,0}$ representam $Renda_{Q42019, Priv.}$ e $Renda_{Q42020, Priv.}$. O objetivo do pareamento é encontrarmos quem pode representar a expressão mais próxima do caso $Y^T_{1,0}$, algo que não existe na realidade. A validade do pareamento baseia-se em duas hipóteses principais:
+
+  **1** - Seleção nos observáveis $Y^T, Y \perp T \mid X_i$ - ou seja, a participação no programa é aleatória quando controlamos pelas características observáveis ($X_i$)
+  
+  **2** - Sobreposição $P(T = 1 \mid X_i) < 1$ - a participação no programa não é totalmente determinada pelas características observáveis, em outras palavras, há suporte comum entre tratados e controle
+  
+Assim, o chamado *efeito médio do tratamento sobre os tratados* amostral é descrito por $D^{ATT} = \frac{\sum_{i=1}^N (Y^T_i - \hat{Y^T_i})}{N^T}$, em que $\hat{Y^T_i}$ consiste exatamente nas observações construídas a partir do pareamento. Quando estamos tratando o *escore de propensão* esse pareamento é feito através de uma regressão linear em que a variável dependente é a participação no programa e as explicativas são elementos relevantes para caracterizar o grupo de interesse. Aqui vamos nos basear no trabalho de @Scorzafave2011, disponível nesse [link](http://bibliotecadigital.fgv.br/ojs/index.php/rbe/article/view/1357/2074), para selecionar as variáveis de interesse: sexo, idade, raça, anos de estudo e unidade da federação.
+
+```{r}
+library(MatchIt)
+```
+
+O primeiro comando será fazermos o pareamento considerando o vizinho mais próximo a partir da regressão que descrevemos acima. Na função `matchit` indicamos que será selecionado o vizinho mais próximo (*nearest* em inglês) a partir da regressão definida pelo *generalized linear model* (`"glm"`). No caso dessa função indicarmos `"glm"` significa apenas fazermos uma regressão do tipo *Probit* das covariadas escolhidas contra o trabalho na semana principal ter sido de trabalho doméstico.
+
+```{r}
+pareamento.1 <- matchit(Domestica ~ V2007 + V2009 + V2010 + as.factor(VD3006) + as.factor(UF),
+                        method = "nearest", distance = "glm",
+                        data = dados.match)
+```
+
+O objeto gerado com o comando acima é uma lista de **13** elementos, na qual encontramos a matriz que indica quais foram as observações pareadas e a própria matriz de variáveis escolhidas para fazer o pareamento, além de algumas outras informações sobre o procedimento. A melhor maneira de identificarmos aquilo que é feito pela função é utilizarmos a função `summary()` nesse objeto[^2], assim podemos ver estatísticas descritivas sobre as variáveis para antes e depois do pareamento.
+
+```{r}
+summary(pareamento.1)
+```
+
+Uma maneira gráfica de enxergar esse pareamento é identificarmos a distribuição do valor do *escore de propensão* para as unidades pareadas do tratamento e e do controle, assim como para aquelas que não acabaram entrando no pareamento. A vizualiação disso é permitida pela função abaixo.
+
+```{r}
+plot(pareamento.1, type = "jitter", interactive = FALSE)
+```
+
+Com o pareamento em mãos, vamos agora buscar esses mesmos indivíduos na pesquisa de 2020, para que seja possível comparar a situação deles após o período de pandemia. Para isso, será preciso recuperarmos no `pareamento.1` a linha de cada observação na nossa base original, a fim de encontrarmos as chaves definidas pela variável `Id` e podermos buscá-la na base de 2020. A indicação de qual a linha original das observações usadas no pareamento está descrita na `match.matrix` definida no `pareamento.1`.  Essa matriz é formada por uma única coluna em que cada valor representa o número da linha em `pnad1$variables` na qual estão as observações utilizadas como controle. Já o nome das linhas de `match.matrix` indica o número da linha da observação tratada. Ou seja, o que nós precisamos são as linhas definidas tanto por `rownames(match.matrix)`, quanto os próprios valores da matriz. Assim vamos criar um vetor que inclua tratados e controle em um único objeto chamado `trat.cont`, ele será utilizado para obtermos as chaves `Id`. 
+
+```{r}
+trat.cont <- c(as.numeric(rownames(pareamento.1$match.matrix)), as.numeric(pareamento.1$match.matrix))
+
+trat.cont <- pnad1$variables$Id[trat.cont]
+
+pareamento.dados.20 <- subset(pnad2, Id %in% trat.cont)
+```
+
+Antes de efetivamente fazermos nossa análise será preciso indicarmos quais observações integram nosso grupo de tratamento e quais integram o grupo de controle. Para isso basta criar uma variável binária fazendo com que tenha valor igual à unidade todas as observações cuja `Id` esteja contida na primeira metade do vetor `trat.cont`, exatamente a parte responsável por indicar os indivíduos tratados. A partir disso podemos analisar elementos como a renda de cada grupo e a permanência no mercado de trabalho como vínhamos fazendo antes com os objetos da classe `survey.design`.
+
+```{r}
+# Identificação de tratados e controles
+pareamento.dados.20$variables$Tratamento <- pareamento.dados.20$variables$Id %in% trat.cont[1:length(trat.cont)/2]
+
+# Renda média 
+confint(svymean(~ VD4017, subset(pareamento.dados.20, Tratamento), na.rm = T)) 
+
+confint(svymean(~ VD4017, subset(pareamento.dados.20, !Tratamento), na.rm = T))
+```
+
+Como podemos notar, a renda entre os grupos segue bastante distante, mesmo após o pareamento. É importante tentar buscar o quanto variou essa renda ao longo dos dois períodos. Outro impacto que também podemos identificar é a taxa de ocupação entre cada um dos grupos. Nesse caso é interessante notarmos que os intervalos de confiança se cruzam, sendo impossível rejeitarmos a hipótese de que as médias são distintas, ao menos ao nível de 95% de significância. De toda forma, o intervalo para a desocupação entre pessoas que não eram empregadas domésticas tem um valor superior de apenas 1,4 pontos percentuais acima do valor mínimo para empregadas domésticas, indicando uma realidade consideravelmente distinta.
+
+```{r}
+# Condição de ocupação
+confint(svymean(~ VD4002 == "Pessoas ocupadas", 
+                subset(pareamento.dados.20, Tratamento), na.rm = T)) 
+
+confint(svymean(~ VD4002 == "Pessoas ocupadas", 
+                subset(pareamento.dados.20, !Tratamento), na.rm = T))
+```
+
+## Exercício
+
+  **1.** O código abaixo é bastante demorado para ser executado. Como você explicaria o que ele está fazendo?
+  
+```{r, eval=FALSE}
+n.dom <- c()
+
+for (ent in 1:5) {
+  
+  dom <- c()
+  
+  for (upa in unique(pnad1$variables$UPA)) dom <- c(dom, 
+                                                    length(unique(pnad1$variables$V1008[pnad1$variables$V1016 == ent & 
+                                                                                               pnad1$variables$UPA == upa])))
+  
+  n.dom <- c(n.dom, mean(dom))
+  
+}
+```
+  
+  **2.** Reproduza os resultados da aula utilizando apenas o sexo e a data de nascimento na identificação dos indivíduos de um mesmo domicílio. 
+  
+  **3.** Identifique qual o impacto sobre as análises dos intervalos de confiança para a média da renda e a proporção de trabalhadores domésticos, como feito em sala, quando reduzimos nossa amostra apenas para as pessoas que podem ser identificadas nas duas pesquisas.
+  
+  **4.** Apesar de nossos resultados em sala, há uma inconsistência nos dados quando consideramos o inverso do que fizemos e analisamos as chaves `Id` da `pnad2` presentes na `pnad1`. Encontre um método de computar quantas chaves estão presentes nas duas bases, mas o número de entrevistas no domicílio é menor do que 5. Note que você deverá novamente somar sentenças lógicas, o problema da questão refere-se a como escrevê-las. 
+  
+  **5.** Experimente explorar gráficos capazes de indicar o quão apropriado foi o pareamento:
+    
+    - `plot(summary(pareamento.1))`
+    
+    - plot(pareamento.1, type = "qq", interactive = FALSE, which.xs = c("VD3006"))
+    
+  **6.** Quando definimos a variável `Tratamento` todas as observações que não os tratados ficaram com valor igual a zero. Por que isso não é um problema? (Dica: note o comportamento dos pesos de cada observação.)
+  
+  **7.** Construa dois gráficos com a função `plot()` para representar os intervalos de confiança que obtivemos com para a renda média e a taxa de ocupação entre tratados e controles.
+  
+  a. Coloque no eixo x apenas dois valores: 1 para controles e 2 para tratados.
+  
+  b. No eixo y indique o valor médio da renda/taxa de ocupação.
+  
+  c. Utilize o comando `arrows()` para indicar o intervalo de confiança. 
+  
+  <span style="color: red;"> **Extra.** </span>  Entenda o funcionamento da função `calibrate()`, utilizada para reponderar os pesos de pesquisas amostrais após uma seleção da amostra, e entre em contato conosco para melhorarmos nossa aula. O funcionamento dessa função segue a metodologia de @Deville1993 e o artigo original pode ser visto [aqui](https://www.jstor.org/stable/pdf/2290793.pdf?refreqid=excelsior%3A95bb5abddcb2cb58ce038ac4d241f846), conforme também indicado por @Teixeira2020.
+
+### Referências
+
+### Notas
+
+[^1]: Lembre-se que é sempre possível acessar o [Dicionário das variáveis](https://www.ibge.gov.br/estatisticas/sociais/trabalho/17270-pnad-continua.html?=&t=downloads).
+
+[^2]: Sempre é possível identificar qual o método dispachado para essas funções utilizando o pacote `sloop`.
