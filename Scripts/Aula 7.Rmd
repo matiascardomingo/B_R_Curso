@@ -1,0 +1,258 @@
+---
+title: "Aula 7"
+author: "Matias Rebello Cardomingo"
+output: html_document
+---
+
+<style>
+
+div.bloco {
+  padding: 1em;
+  background: #E6E6FA; 
+  color: #C71585;
+  border-radius: 10px;
+}
+
+</style>
+
+```{r klippy, echo=FALSE, include=TRUE}
+
+klippy::klippy(position = c("top", "right"), 
+               tooltip_message = "Copiar código", 
+               tooltip_success = "Agora é só colar no scritp")
+
+```
+
+Um ótimo manual para obtenção dos dados da Pesquisa Nacional por Amostra de Domicílios (PNAD) foi produzido pelo [Douglas Braga](https://rpubs.com/BragaDouglas/335574) (IBGE), há também um [manual em português](https://cran.r-project.org/web/packages/PNADcIBGE/readme/README.html) do pacote. Baixe o pacote no seu **R**:
+
+```{r, eval=FALSE}
+install.packages("PNADcIBGE")
+```
+
+Nós vamos fazer o download de nossos dados aplicando uma opção bastante útil do pacote que permite deflacionar as variáveis para um período de referência. Para isso basta indicar o ano para qual será deflacionado no argumento `defyear =` e o trimestre em `defperiod =`, além de indicar que os deflatores devem ser considerados através do argumento `deflator =`. O argumento `vars` permite selecionar as variáveis que serão utilizadas. É bastante útil, dado que o arquivo completo é muito grande. Para pesquisar quais variáveis podem ser as mais interessantes para você, busque no [dicionário](https://www.ibge.gov.br/estatisticas/sociais/trabalho/17270-pnad-continua.html?=&t=downloads) a descrição de cada uma delas. Ao clicar no link acima basta seguir o caminho: `Trimestral > Microdados > Documentacao > Dicionario_e_input_AAAAMMDD.ZIP`. A descrição das variáveis que vamos utilizar nessa aula está indicada abaixo.
+
+```{r, message=FALSE, warning=FALSE}
+library(PNADcIBGE)
+
+pnad201904 <- get_pnadc(year = 2020,
+                        quarter = 4,
+                        defyear = 2021,
+                        defperiod = 2,
+                        deflator = T, 
+                        vars = c("V2007", # Sexo
+                                 "V2010", # Raça
+                                 "VD4001", # Condição em relação à força de trabalho
+                                 "VD4002", # Condição de ocupação
+                                 "VD4004A", # Subocupação por insuficiência de horas habitualmente trabalhadas
+                                 "VD4017", # Rendimento mensal efetivo do trabalho principal
+                                 "VD4030")) # Motivo pelo qual não procurou/gostaria/estava disponível para trabalho
+```
+
+Note a classe do objeto que nós geramos, essa classe pertence ao [pacote](https://cran.r-project.org/web/packages/survey/survey.pdf) `survey`, baixado junto com `PNADcIBGE`. É possível desativarmos esse modo definindo o argumento `design` como falso, então passamos a obter apenas uma base de dados de classe `data.frame`, contudo isso retira a possibilidade de analisarmos as características de amostragem da pesquisa. 
+
+Também é interessante identificar o nível de detalhamento das nossas informações, mesmo tendo selecionado apenas 7 variáveis, nossa base de dados expressa em `pnad201904` contém `r ncol(pnad201904)` colunas diferentes.
+
+No caso em que já temos os microdados em formato `.txt` é possível usarmos a função `read_pnadc`, nesse caso é preciso já ter o dicionário para conseguir rotular as variáveis. Com ele podemos utilizar da função `pnadc_labeller()` para obter as variáveis `factor` como quando fazemos o download online. Por fim, para converter o objeto na classe `"survey.design"` usamos da função `pnadc_design()`. Repare, por fim, na estrutura do objeto que armazena, entre algumas outras coisas, um `data.frame` chamado `variables`. É através dele que podemos inserir novas variáveis. Vamos gerar uma nova variável aplicando o deflator `Efetivo` sobre a variável `VD4017` e obter a série deflacionada para o segundo trimestre de 2021. 
+
+```{r}
+
+pnad201904$variables$EfetivaDef <- pnad201904$variables$Efetivo * pnad201904$variables$VD4017
+
+```
+
+Agora vamos acionar o pacote `survey` para analisarmos as informações obtidas. Como dissemos, a vantagem de objetos como esse é o fato deles permitirem atribuir pesos distintos aos dados coletados. Trata-se da amostragem feita pelo IBGE para determinar quantas pessoas devem ser entrevistadas em cada nicho (geográfico, de renda e etc.) a fim de se ter uma amostra representativa da população.
+
+```{r, message=FALSE}
+library(survey)
+```
+
+Esse pacote possui uma série de funções para produzir estatísticas descritivas nas funções `suverysummary`. Vamos obter a média e a variância para os rendimentos auferidos na PNAD através da nova variável `"EfetivaDef"`. 
+
+```{r}
+
+
+renmed1904 <- svymean(x = ~ EfetivaDef, # Formula
+                      design = pnad201904, # Base de dados da classe "survey.design"
+                      na.rm = T) # Remover NA
+
+renmed1904
+```
+
+Note que agora `renmed1904` é um objeto da classe `svystat`, pois carrega estatísticas descritivas associadas a um objeto da classe `"survey.design"`. Com essa nova classe podemos calcular, por exemplo, o intervalo de confiança da estatística obtida. Ou seja, em 95 de cada 100 vezes que extraírmos a média da população ela estará dentro do intervalo dado por[^1]:
+
+```{r, eval=FALSE}
+confint(renmed1904)
+```
+
+Podemos também ver a composição de nossa amostra através da proporção de variáveis categóricas como `"Sexo"` e `"Raça"`. Nesse caso vamos usar a função `interaction()` (responsável por interagir variáveis da classe `"factor"`) dentro da `formula` que servirá como argumento na função `svymean`.
+
+```{r}
+comp1904 <- svymean(x = ~ interaction(V2010, V2007), # Formula
+                    design = pnad201904, # Base de dados da classe "survey.design"
+                    na.rm = T) # Remover NA
+```
+
+Para exibir esse elemento vamos usar a função `round()`, que permite definirmos quantos números após a vírgula queremos através do argumento `digits =`. Com isso evitamos olhar os números com notações científicas que dificultam a compreensão.
+
+```{r}
+round(comp1904, digits = 2)
+```
+
+Há também a possibilidade de analisarmos a razão entre algumas variáveis através da função `svyratio()`. Um exemplo bastante comum é identificarmos a situação de ocupação entre as pessoas que integram a força de trabalho, ou até mesmo a participação na força de trabalho no total das pessoas. Nessa função nós definimos o numerador e o denominador de nossa razão, sendo preciso estabelecer uma condição lógica para quais valores devem ser incluídos. Note que no caso da participação na força de trabalho nós estabelecemos como condição que deve ser diferente de `NA`, valor atribuído na base para respostas descritas no dicionário como `"Não aplicável"`.
+
+```{r}
+ocup1904 <- svyratio(numerator = ~VD4002 == "Pessoas desocupadas", 
+                     denominator = ~VD4001 == "Pessoas na força de trabalho",
+                     design = pnad201904,
+                     na.rm = T)
+
+ocup1904
+
+part1904 <- svyratio(numerator = ~VD4001 == "Pessoas na força de trabalho", 
+                     denominator = ~ !is.na(VD4001),
+                     design = pnad201904,
+                     na.rm = T)
+
+part1904
+```
+
+Já o cálculo de quantis pode ser feito por meio da função `svyquantile()`, que permite estabelecer um vetor de quais quantis serão extraídos dos dados. No nosso caso, vamos obter cada um dos decis de renda e o último percentil (ou seja, o valor equivalente ao 1% mais rico da população). Na sequência veremos quanto da renda total é apropriada por cada um deles.
+
+```{r}
+quanti1904 <- svyquantile(x = ~ EfetivaDef,
+                          design = pnad201904,
+                          quantiles = c(seq(from = .1, to = .9, by = .1), .99),
+                          na.rm = T)
+
+quanti1904
+```
+
+Para conseguirmos identificar quanto da renda total é apropriado por cada decil, vamos precisar em primeiro lugar obter a renda total e, na sequência, obter o total da renda de cada um dos quantis que definimos acima. Uma função que pode nos ajudar nesse caso é a `svytotal()`, que soma o total da variável em questão. Para a renda total, portanto, basta fazermos:
+
+```{r}
+rentot1904 <- svytotal(x = ~ EfetivaDef,
+                       design = pnad201904,
+                       na.rm = T)
+
+rentot1904
+```
+
+Para conseguirmos obter a renda apropriada por cada um dos quantis, vamos entender um pouco mais o papel da classe `"survey.design"` em todas essas operações que temos feito. Em primeiro lugar, repare a utilidade da função `svytotal()` comparando a soma do vetor de rendas com o resultado que acabamos de obter.
+
+```{r}
+sum(pnad201904$variables$EfetivaDef, na.rm = T) - rentot1904[1]
+```
+
+A diferença entre eles está exatamente no fato da amostragem atribuir um peso distinto para cada uma das observações conforme as características da pessoa entrevistada. Dentro dos objetos da classe `"survey.design"` isso é feito pelo vetor `prob`, utilizado para construir o peso amostral das observações da seguinte forma: $peso = \ 1 \ / \ objeto\$prob$. É possível ver isso com mais nitidez através do próprio [código](https://github.com/cran/survey/blob/master/R/survey.R) do pacote `survey`. Procure, por exemplo, pela função `svymean()` que usamos acima, nela podemos ver uma linha de comando que define exatamente `pweights<-1/design$prob`. Uma maneira de tornar isso mais nítido é olharmos para nosso próprio vetor antes e depois de selecionarmos um determinado grupo.
+
+Como nós não temos uma variável capaz de identificar cada um dos estratos, vamos utilizar de um ciclo `for` que permite estabelecer uma classificação para cada indivíduo a depender do ponto da distribuição em que ele está de acordo com sua renda. Repare aqui em uma *seleção* mais complexa que fazemos dentro do ciclo, no trecho `pnad201904$variables$Quant` nós selecionamos dentro do objeto `pnad201904` a base de dados fornecida por `variables`; na sequência nós criamos uma nova variável dentro dessa base chamada `Quant`. Ou seja, na primeira vez o `$` serve para acessar os elementos, enquanto na segunda ele é utilizado para definir uma nova variável.
+
+Agora busque entender os dois critérios que nós definimos para determinação da nova variável `Quant`. Em primeiro lugar criamos o vetor `quantis`, que reune a renda responsável por estabelecer cada um dos percentis, além de acrescentar o valor `0` e o valor máximo de todo o vetor de rendas (`max(pnad201904$variables$EfetivaDef, na.rm = T)`). Como nós queremos definir os percentis da distribuição tomando intervalos de valores, será preciso estabelecer qual o piso e qual o teto da renda para integrar aquele quantil. Como você pode notar, o piso da faixa é estabelecido na primeira condição do vetor (`pnad201904$variables$EfetivaDef >= quantis[quant - 1]`), enquanto o teto é determinado na segunda condição (`pnad201904$variables$EfetivaDef <= quantis[quant]`).
+
+```{r}
+
+quantis <- c(0, quanti1904$EfetivaDef[,1], max(pnad201904$variables$EfetivaDef, na.rm = T))
+
+names(quantis) <- c("0", rownames(quanti1904$EfetivaDef), "Max")
+
+for (quant in 2:length(quantis)) {
+  
+  rotulo <- paste(names(quantis)[c(quant - 1, quant)], collapse = " - ")
+  
+  pnad201904$variables$Quant[pnad201904$variables$EfetivaDef >= quantis[quant - 1] &
+                               pnad201904$variables$EfetivaDef <= quantis[quant]] <- rotulo
+  
+}
+
+```
+
+Muito bem, agora, para podermos identificar quanto da renda é apropriada por cada um dos quantis, vamos fazer uma *seleção* dos nossos dados usando da função `subset` para restringir a amostra para cada um deles. Como de costume, vamos criar um *ciclo* que nos permita subdivir a base da maneira como queremos, assim não precisamos repetir essa tarefa para cada um dos quantis. Mas antes disso vamos observar por um instante qual o papel da função `subset` ao lidar com um objeto da classe `survey.design`. Quando nós criamos um novo objeto composto apenas por pessoas pessoas pertencentes ao primeiro decil de renda através dessa função, nossa base dados seguirá com `r nrow(pnad201904$variables)` linhas. O que será alterado, por sua vez é o vetor `pnad201904$prob`, de tal forma que todas as observações de pessoas com renda maior do que o primeiro estratato terão um valor igual a `Inf`, ou inifito, afinal, como os pesos são definidos como o inverso da probabilidade (conforme discutimos acima), então observações com `prob = Inf` serão aquelas que o peso será igual a zero no cálculo das estatísticas. Veja os únicos valores de `prob` quando selecionamos rendas da último percentil.
+
+```{r}
+pnad201904.Quant0 <- subset(pnad201904, Quant == "0 - 0.1")
+
+unique(pnad201904.Quant0$prob[pnad201904.Quant0$variables$EfetivaDef >= 17000])
+```
+
+Assim, podemos calcular o total da renda de cada um dos quantis que definimos acima e, em seguida, dividir por `rentot1904`. 
+
+```{r}
+categorias <- setdiff(unique(pnad201904$variables$Quant), NA) # Obter os decis
+
+categorias <- categorias[c(10,6,11,2,4,3,7,1,8,5,9)] # Ordenar os decis manualmente
+
+totquant1904 <- c()
+
+for (quant in categorias) {
+  
+  total <- svytotal(x = ~ EfetivaDef,
+                       design = subset(pnad201904, Quant == quant),
+                       na.rm = T)
+  
+  totquant1904 <- c(totquant1904, total)
+  
+}
+
+names(totquant1904) <- c(paste(seq(0, .9, .1)), "0.99")
+```
+
+Por fim, vamos obter a participação de cada um dos quantis de renda na renda nacional.
+
+```{r}
+totquant1904/rentot1904 * 100
+```
+
+A partir desses dados é possível usarmos a função `cumsum`, similar à `cumprod` que usamos na **Aula 5** para gerar uma *Curva de Lorenz* do Brasil.
+
+```{r}
+
+plot(x = seq(0, 1, .1), 
+     y = c(cumsum(totquant1904[-11]/rentot1904), 1),
+     type = "l",
+     col = "red",
+     xlab = "Quantil",
+     ylab = "% da Renda",
+     main = "Curva de Lorenz - 4º Tri 2019")
+
+lines(x = seq(0, 1, .1),
+      y = seq(0, 1, .1))
+
+```
+
+Por fim, vamos aprender uma última função para gerar estatísticas descritivas do pacote `survey`. Ele é responsável por permitir agruparmos variáveis (`formula =`) a partir de uma outra usada como critério (`by =`), por exemplo buscar a renda média entre homens e mulheres, ou brancos e negros e assim sucessivamente. Após indicarmos a variável a ser analisada e aquela que definirá os agrupamentos, é preciso definirmos que tipo de estatística descritiva queremos, nesse caso vamos utilizar a `svymean()`. 
+
+```{r}
+renda.genero <- svyby(formula = ~ EfetivaDef, # Renda
+                      by = ~ V2007, # Gênero
+                      design = pnad201904, 
+                      svymean, # Função para gerar estatística de interesse
+                      na.rm = T) # Remover valores faltanates 
+```
+
+Novamente é possível definirmos, por exemplo, intervalos de confiança para esses valores, tal como fizemos acima. Nesse caso você há de notar que a média do salário das mulheres fica estatisticamente bastante abaixo do salário obtido pelos homens. Mas nós podemos aprofundar ainda mais nossa leitura interagindo a variável de gênero com a variável de raça, usando da mesma função para interagir `factors` que aplicamos acima.
+
+```{r}
+renda.gen.rac <- svyby(formula = ~ EfetivaDef, # Renda
+                      by = ~ interaction(V2007, V2010), # Gênero
+                      design = pnad201904, 
+                      svymean, # Função para gerar estatística de interesse
+                      na.rm = T) # Remover valores faltanates 
+```
+
+### Exercícios
+
+**1.**  Tente reproduzir o `for` em que criamos a nova variável `Quant` utilizando a função `case_when()` do pacote `dplyr` (Obs: será necessário instalar esse pacote, pois ele ainda não foi utilizado).
+
+  a. Era possível termos criado um outro vetor `rotulo` para os quantis que não exigisse chamarmos a função `names` nesse caso. Bastava `rotulo` ser definido antes do **ciclo** e então chamado dentro dele para nomear cada um dos quantis. Como isso pode ser feito?
+
+**2.** Qual a diferença entre as variáveis que utilizamos como argumento da função `interaction()` em `svymean()` e as variáveis usadas em `svyby()`. Por que não é possível usarmos `interaction()`, por exemplo, para compreendermos a diferença no comportamento da renda entre gênero e raça.
+
+  a. Qual outra função que utilizamos no curso que aceitava como argumento o nome de uma função, tal como `svyby`? Como chamamos esse tipo de função?
+  
+**3.**  Utilize a função `svylorenz` do pacote `convey` (será preciso baixar esse pacote) para gerar uma curva de Lorenz da renda. Será preciso definir a variável para a qual queremos a análise, e também os quantis através do argumento `quantile = seq(0, 1, .1)`. 
+  
+**4.** Substitua o `intersect()` na função `svyby` que usamos para gerar `renda.gen.rac` por `interaction(V2007, V2010 %in% c("Preta", "Parda"))` e interprete o resultado.
+
+### Referências
+
+[^1]: Lembre-se que todos esses valores já foram deflacionados para o quarto trimestre de 2020.
